@@ -8,3 +8,4 @@
 
 ## Compressing data
 ```./compress_adios config.json input.bp output.bp```
+```./compress_mgard config.json input.bp output.bp```

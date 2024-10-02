@@ -1,24 +1,24 @@
 {
-  "connectivity": "ElementConnectivity",
+  "connectivity": "/hpMusic_base/hpMusic_Zone/Elem/ElementConnectivity",
   "coo_names": [
-    "GridCoordinates/CoordinateX",
-    "GridCoordinates/CoordinateY",
-    "GridCoordinates/CoordinateZ"
+    "/hpMusic_base/hpMusic_Zone/GridCoordinates/CoordinateX",
+    "/hpMusic_base/hpMusic_Zone/GridCoordinates/CoordinateY",
+    "/hpMusic_base/hpMusic_Zone/GridCoordinates/CoordinateZ"
   ],
   "var_names": [
-    "FlowSolution/Q_CRITERIA",
-    "FlowSolution/RHE",
-    "FlowSolution/RHO",
-    "FlowSolution/RVX",
-    "FlowSolution/RVY",
-    "FlowSolution/RVZ"
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/P_aver",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/Rho_aver",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/U_aver",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/V_aver",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/W_aver"
   ],
 
   "keep_index_map": false,
 
   "s": 0.0,
-  "rel_tol": 0.001,
+  "rel_tol": 0.0023,
 
-  "max_block_id": -1,
-  "num_nodes_in_bp_element": 8
+  "max_block_id": 1,
+  "max_step": 0,
+  "n_nodes_in_element": 8
 }

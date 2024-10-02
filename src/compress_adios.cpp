@@ -23,6 +23,25 @@ using BYTE = unsigned char;
 
 int main(int argc, char *argv[])
 {
+	///////////////////////////////////////////////////////////////////////////
+	// MPI
+
+	int rank, nranks;
+#if ADIOS2_USE_MPI
+	int provided;
+
+	// MPI_THREAD_MULTIPLE is only required if you enable the SST MPI_DP
+	MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+#else
+	rank = 0;
+	nranks = 1;
+#endif
+
+
+	///////////////////////////////////////////////////////////////////////////
+	// config
 	// read config file
 	if (argc<4){
 		std::cerr << "Config JSON file is required as input" << std::endl;
@@ -39,7 +58,11 @@ int main(int argc, char *argv[])
 
 
 	// setup ADIOS readers/writers
+#if ADIOS2_USE_MPI
+	adios2::ADIOS adios(MPI_COMM_WORLD);
+#else
 	adios2::ADIOS adios;
+#endif
 	adios2::IO reader_io = adios.DeclareIO("BPReader");
 	adios2::IO writer_io = adios.DeclareIO("BPWriter");
 	reader_io.SetEngine("BPFile");
@@ -48,7 +71,50 @@ int main(int argc, char *argv[])
 	adios2::Engine bpWriter = writer_io.Open(argv[3], adios2::Mode::Write);
 
 
+	///////////////////////////////////////////////////////////////////////////
+
+
+	const DTYPE s = config["s"];
+	const DTYPE rel_tol = config["rel_tol"];
+
+	// ADIOS compression
+	adios2::Operator op = adios.DefineOperator("mgardplus", "mgardplus");
+
+
+	///////////////////////////////////////////////////////////////////////////
+	// define output ADIOS variables
+
+
+	// adios2::Variable<int64_t> out_adios_connectivity = writer_io.DefineVariable<int64_t>(connectivity_name, {}, {}, {adios2::UnknownDim});
+
+	// std::vector<adios2::Variable<double>> out_adios_coos(coo_names.size());
+	// for (int i=0; i<coo_names.size(); i++)
+	// 	out_adios_coos[i] = writer_io.DefineVariable<double>(coo_names[i], {}, {}, {adios2::UnknownDim});
+
+	std::vector<adios2::Variable<DTYPE>> out_adios_vars(var_names.size());
+	for (int i=0; i<var_names.size(); i++){
+		// double abs_tol = rel_tol * (adios_vars[i].Max()-adios_vars[i].Min());
+		// abs_tol = std::max(1.e-6, rel_tol * (adios_vars[i].Max()-adios_vars[i].Min()));
+		out_adios_vars[i] = writer_io.DefineVariable<DTYPE>(var_names[i], {}, {}, {adios2::UnknownDim});
+		// out_adios_vars[i].AddOperation(op, {{"accuracy", std::to_string(abs_tol)}, {"mode", "ABS"}});
+		// std::cout << abs_tol << std::endl;
+	}
+
+	///////////////////////////////////////////////////////////////////////////
+
+
+	double total_time = 0;
+
+
+	// time stepping
+	while (true){
+
+
 	adios2::StepStatus read_status = bpReader.BeginStep(adios2::StepMode::Read, -1.0f);
+	size_t step = bpReader.CurrentStep();
+	if (step>config["max_step"] or read_status!=adios2::StepStatus::OK)
+		break;
+	bpWriter.BeginStep();
 
 
 	///////////////////////////////////////////////////////////////////////////
@@ -71,30 +137,6 @@ int main(int argc, char *argv[])
 
 
 	///////////////////////////////////////////////////////////////////////////
-	// define output ADIOS variables
-
-	const DTYPE s = config["s"];
-	const DTYPE rel_tol = config["rel_tol"];
-
-	// ADIOS compression
-	adios2::Operator op = adios.DefineOperator("mgardplus", "mgardplus");
-
-	// adios2::Variable<int64_t> out_adios_connectivity = writer_io.DefineVariable<int64_t>(connectivity_name, {}, {}, {adios2::UnknownDim});
-
-	// std::vector<adios2::Variable<double>> out_adios_coos(coo_names.size());
-	// for (int i=0; i<coo_names.size(); i++)
-	// 	out_adios_coos[i] = writer_io.DefineVariable<double>(coo_names[i], {}, {}, {adios2::UnknownDim});
-
-	std::vector<adios2::Variable<DTYPE>> out_adios_vars(var_names.size());
-	for (int i=0; i<var_names.size(); i++){
-		// double abs_tol = rel_tol * (adios_vars[i].Max()-adios_vars[i].Min());
-		// abs_tol = std::max(1.e-6, rel_tol * (adios_vars[i].Max()-adios_vars[i].Min()));
-		out_adios_vars[i] = writer_io.DefineVariable<DTYPE>(var_names[i], {}, {}, {adios2::UnknownDim});
-		// out_adios_vars[i].AddOperation(op, {{"accuracy", std::to_string(abs_tol)}, {"mode", "ABS"}});
-		// std::cout << abs_tol << std::endl;
-	}
-
-	///////////////////////////////////////////////////////////////////////////
 	// compress variables
 
 
@@ -103,7 +145,8 @@ int main(int argc, char *argv[])
 	size_t nblocks = blocks.size();
 	int block_id = 0;
 	for (auto &block : blocks){
-		std::cout << "blockID = " << block.BlockID << " out of " << nblocks << std::endl;
+		auto start = std::chrono::high_resolution_clock::now();
+		std::cout << "step = " << step << ", blockID = " << block.BlockID << "/" << nblocks;
 
 		// allocate memory for reading variables
 		std::vector<int64_t> ElementConnectivity;
@@ -149,13 +192,34 @@ int main(int argc, char *argv[])
 		}
 		bpWriter.PerformPuts();
 
+		///////////////////////////////////////////////////////////////
 
-	if (config["max_block_id"]>=0 and block_id++>=config["max_block_id"]) break;
+		auto end = std::chrono::high_resolution_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
+		total_time += (double)duration.count() / 1e6;
+
+		std::cout << std::setprecision(3) << ", time = " << (double)duration.count() / 1e6 << " sec" << std::endl;
+
+
+		///////////////////////////////////////////////////////////////
+
+		if (config["max_block_id"]>=0 and block_id++>=config["max_block_id"]) break;
 	}
 
-	bpReader.EndStep(); // end logical step
+	bpReader.EndStep();	// end logical step
+	bpWriter.EndStep();	// end logical step
+	}
+
+
+	std::cout << "\n Total time = " << std::setprecision(3) << total_time << std::endl;
+
+
 	bpReader.Close();  // close engine
 	bpWriter.Close();  // close engine
 
+#if ADIOS2_USE_MPI
+	MPI_Finalize();
+#endif
+	return 0;
 }

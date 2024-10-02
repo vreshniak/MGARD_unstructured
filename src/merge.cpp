@@ -334,7 +334,7 @@ int main(int argc, char *argv[])
 		total_unique_nodes += inv_map.size();
 		total_time += (double)duration.count() / 1e6;
 
-		std::cout << "\tNum. orig./uniq. nodes = " << coos[0].size() << " / " << inv_map.size()
+		std::cout << "\tNum. orig./uniq. nodes = " << coos[0].size() << "/" << inv_map.size()
 				<< std::setprecision(3)
 				<< ", redundancy = " <<  (double)coos[0].size()/(double)inv_map.size()
 				<< ", time = " << (double)duration.count() / 1e6 << " sec" << std::endl;
@@ -380,8 +380,9 @@ int main(int argc, char *argv[])
 	bpWriter.EndStep();	// end logical step
 	}
 
-	std::cout << "Total num. orig. points = " << total_nodes << std::endl;
-	std::cout << "Total num. uniq. points = " << total_unique_nodes << std::endl;
+	std::cout << "Total num. orig. nodes = " << total_nodes << std::endl;
+	std::cout << "Total num. uniq. nodes = " << total_unique_nodes << std::endl;
+	std::cout << "Total redundancy = " << (double)total_nodes/(double)total_unique_nodes << std::endl;
 	std::cout << "Total time = " << std::setprecision(3) << total_time << std::endl;
 
 	bpReader.Close();	// close engine

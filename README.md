@@ -1,5 +1,8 @@
 # MGARD_unstructured
 
+## Build
+```bash ./build.sh```
+
 ## Merging data
 ```./merge config.json input.bp output.bp```
 

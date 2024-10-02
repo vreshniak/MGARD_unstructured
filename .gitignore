@@ -8,3 +8,4 @@ extract_data
 merge
 reorder
 compress_adios
+compress_mgard

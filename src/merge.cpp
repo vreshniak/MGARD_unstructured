@@ -301,9 +301,9 @@ int main(int argc, char *argv[])
 
 		for (int i=0; i<coo_names.size(); i++) merged_coos[i] = merge_values(inv_map, coos[i]);
 		for (int i=0; i<var_names.size(); i++) merged_vars[i] = merge_values(inv_map, vars[i]);
-		for (int i=0; i<var_names.size(); i++)
-			for (int j=0; j<merged_vars[i].size(); j++)
-		 		merged_vars[i][j] = j;
+		// for (int i=0; i<var_names.size(); i++)
+		// 	for (int j=0; j<merged_vars[i].size(); j++)
+		//  		merged_vars[i][j] = j;
 
 
 		//////////////////////////////////////////////////////////////////////////////////

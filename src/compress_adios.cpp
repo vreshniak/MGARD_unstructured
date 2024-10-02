@@ -42,6 +42,7 @@ int main(int argc, char *argv[])
 
 	///////////////////////////////////////////////////////////////////////////
 	// config
+
 	// read config file
 	if (argc<4){
 		std::cerr << "Config JSON file is required as input" << std::endl;
@@ -72,6 +73,7 @@ int main(int argc, char *argv[])
 
 
 	///////////////////////////////////////////////////////////////////////////
+	// compression config
 
 
 	const DTYPE s = config["s"];
@@ -85,11 +87,11 @@ int main(int argc, char *argv[])
 	// define output ADIOS variables
 
 
-	// adios2::Variable<int64_t> out_adios_connectivity = writer_io.DefineVariable<int64_t>(connectivity_name, {}, {}, {adios2::UnknownDim});
+	adios2::Variable<int64_t> out_adios_connectivity = writer_io.DefineVariable<int64_t>(connectivity_name, {}, {}, {adios2::UnknownDim});
 
-	// std::vector<adios2::Variable<double>> out_adios_coos(coo_names.size());
-	// for (int i=0; i<coo_names.size(); i++)
-	// 	out_adios_coos[i] = writer_io.DefineVariable<double>(coo_names[i], {}, {}, {adios2::UnknownDim});
+	std::vector<adios2::Variable<double>> out_adios_coos(coo_names.size());
+	for (int i=0; i<coo_names.size(); i++)
+		out_adios_coos[i] = writer_io.DefineVariable<double>(coo_names[i], {}, {}, {adios2::UnknownDim});
 
 	std::vector<adios2::Variable<DTYPE>> out_adios_vars(var_names.size());
 	for (int i=0; i<var_names.size(); i++){
@@ -168,20 +170,21 @@ int main(int argc, char *argv[])
 		//////////////////////////////////////////////////////////////////////////////////
 		// save compressed variables
 
-		// out_adios_connectivity.SetSelection(adios2::Box<adios2::Dims>({}, {ElementConnectivity.size()}));
-		// bpWriter.Put<int64_t>(out_adios_connectivity, ElementConnectivity.data(), adios2::Mode::Sync);
+		out_adios_connectivity.SetSelection(adios2::Box<adios2::Dims>({}, {ElementConnectivity.size()}));
+		bpWriter.Put<int64_t>(out_adios_connectivity, ElementConnectivity.data(), adios2::Mode::Sync);
 
-		// for (int i=0; i<coo_names.size(); i++){
-		// 	out_adios_coos[i].SetSelection(adios2::Box<adios2::Dims>({}, {coos[i].size()}));
-		// 	bpWriter.Put<DTYPE>(out_adios_coos[i], coos[i].data(), adios2::Mode::Sync);
-		// }
+		for (int i=0; i<coo_names.size(); i++){
+			out_adios_coos[i].SetSelection(adios2::Box<adios2::Dims>({}, {coos[i].size()}));
+			bpWriter.Put<DTYPE>(out_adios_coos[i], coos[i].data(), adios2::Mode::Sync);
+		}
 
 		for (int i=0; i<var_names.size(); i++){
 			// find absolute tolerance
 			DTYPE mag_v = 0;
 			for (size_t k=0; k<vars[i].size(); k++)
 				mag_v += vars[i][k] * vars[i][k] / vars[i].size();
-			DTYPE abs_tol = rel_tol * std::sqrt(mag_v);
+			DTYPE L2_norm = std::sqrt(mag_v);
+			DTYPE abs_tol = rel_tol * L2_norm;
 
 			out_adios_vars[i].AddOperation(op, {{"accuracy", std::to_string(abs_tol)}, {"mode", "ABS"}});
 
@@ -191,6 +194,7 @@ int main(int argc, char *argv[])
 			out_adios_vars[i].RemoveOperations();
 		}
 		bpWriter.PerformPuts();
+
 
 		///////////////////////////////////////////////////////////////
 
@@ -212,7 +216,7 @@ int main(int argc, char *argv[])
 	}
 
 
-	std::cout << "\n Total time = " << std::setprecision(3) << total_time << std::endl;
+	std::cout << "\nTotal time = " << std::setprecision(3) << total_time << std::endl;
 
 
 	bpReader.Close();  // close engine

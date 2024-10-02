@@ -207,21 +207,6 @@ int main(int argc, char *argv[])
 		adios_vars[i] = reader_io.InquireVariable<double>(var_names[i]);
 
 
-	// ///////////////////////////////////////////////////////////////////////////
-	// // define output ADIOS variables
-	// // adios2::Variable<size_t> inv_map_out = writer_io.DefineVariable<size_t>("inv_map", {}, {}, {adios2::UnknownDim});
-
-	// adios2::Variable<int64_t> out_adios_connectivity = writer_io.DefineVariable<int64_t>(connectivity_name, {}, {}, {adios2::UnknownDim});
-
-	// std::vector<adios2::Variable<double>> out_adios_coos(coo_names.size());
-	// for (int i=0; i<coo_names.size(); i++)
-	// 	out_adios_coos[i] = writer_io.DefineVariable<double>(coo_names[i], {}, {}, {adios2::UnknownDim});
-
-	// std::vector<adios2::Variable<double>> out_adios_vars(var_names.size());
-	// for (int i=0; i<var_names.size(); i++)
-	// 	out_adios_vars[i] = writer_io.DefineVariable<double>(var_names[i], {}, {}, {adios2::UnknownDim});
-
-
 	///////////////////////////////////////////////////////////////////////////
 	// reorder
 

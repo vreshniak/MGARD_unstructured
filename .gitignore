@@ -3,3 +3,8 @@ json_test/
 build/
 *.txt
 *.png
+*.py
+extract_data
+merge
+reorder
+compress_adios

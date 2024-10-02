@@ -406,6 +406,7 @@ int main(int argc, char *argv[])
 	bpWriter.EndStep();	// end logical step
 	}
 
+	std::cout << "Total time = " << std::setprecision(3) << total_time << std::endl;
 
 	bpReader.Close();	// close engine
 	bpWriter.Close();	// close engine

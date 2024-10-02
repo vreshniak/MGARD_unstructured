@@ -271,54 +271,6 @@ int main(int argc, char *argv[])
 
 		auto node_order = find_node_order(GlobalConnectivity, coos);
 
-		// std::vector<bool>   node_notvisited(num_nodes, true);
-		// std::vector<size_t> node_order(num_nodes, 0);
-		// node_notvisited[0] = false;
-		// size_t curr_node = 0;
-		// size_t node_num_visited = 1;
-		// while (node_num_visited<num_nodes){
-		// 	// find connected nodes that have not been visited yet
-		// 	std::vector<size_t> nns;
-		// 	for (const auto & n : GlobalConnectivity[curr_node])
-		// 		if (node_notvisited[n])
-		// 			nns.push_back(n);
-
-		// 	// if((node_num_visited-1)%1000==0){
-		// 	// 	std::cout << curr_node << ": ";
-		// 	// 	for (const auto & n : nns) std::cout << n << " ";
-		// 	// 	std::cout << std::endl;
-		// 	// }
-
-		// 	size_t next_node;
-		// 	if (nns.size()>0){
-		// 		double min_dst = 1.e15;
-		// 		for (size_t i=0; i<nns.size(); i++){
-		// 			size_t candidate = nns[i];
-		// 			double dst = 0;
-		// 			for (auto &coo : coos)
-		// 				dst += (coo[curr_node]-coo[candidate]) * (coo[curr_node]-coo[candidate]);
-		// 			if (dst<min_dst){
-		// 				min_dst   = dst;
-		// 				next_node = candidate;
-		// 			}
-		// 			// std::cout << dst << " " << node1 << std::endl;
-		// 		}
-		// 		// std::cout << min_dst << " " << next_node << std::endl;
-		// 		// break;
-		// 	}else{
-		// 		// find first not visited node
-		// 		next_node = std::find(node_notvisited.begin(), node_notvisited.end(), true) - node_notvisited.begin();
-		// 	}
-		// 	node_notvisited[next_node]   = false;
-		// 	node_order[node_num_visited] = next_node;
-
-		// 	curr_node = next_node;
-		// 	node_num_visited++;
-
-		// 	// if(node_num_visited%1000==0)
-		// 	// 	std::cout << node_num_visited << " " << num_nodes << " " << curr_node << std::endl;
-		// }
-
 		// for (int i=0; i<10; i++)
 		// 	std::cout << node_order[i] << " ";
 		// std::cout << std::endl;

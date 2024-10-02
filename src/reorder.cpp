@@ -5,6 +5,9 @@
 #include <iostream>
 #include <fstream>
 
+#include <mpi.h>
+#include <chrono>
+
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -106,6 +109,26 @@ auto find_node_order(const std::vector<std::set<size_t>> &GlobalConnectivity, co
 
 int main(int argc, char *argv[])
 {
+	///////////////////////////////////////////////////////////////////////////
+	// MPI
+
+	int rank, nranks;
+#if ADIOS2_USE_MPI
+	int provided;
+
+	// MPI_THREAD_MULTIPLE is only required if you enable the SST MPI_DP
+	MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+#else
+	rank = 0;
+	nranks = 1;
+#endif
+
+
+	///////////////////////////////////////////////////////////////////////////
+	// config
+
 	// read config file
 	if (argc<4){
 		std::cerr << "Config JSON file is required as input" << std::endl;
@@ -122,7 +145,11 @@ int main(int argc, char *argv[])
 
 
 	// setup ADIOS readers/writers
+#if ADIOS2_USE_MPI
+	adios2::ADIOS adios(MPI_COMM_WORLD);
+#else
 	adios2::ADIOS adios;
+#endif
 	adios2::IO reader_io = adios.DeclareIO("BPReader");
 	adios2::IO writer_io = adios.DeclareIO("BPWriter");
 	reader_io.SetEngine("BPFile");
@@ -133,23 +160,6 @@ int main(int argc, char *argv[])
 
 	// // ADIOS compression
 	// adios2::Operator op = adios.DefineOperator("mgardplus", "mgardplus");
-
-
-	adios2::StepStatus read_status = bpReader.BeginStep(adios2::StepMode::Read, -1.0f);
-
-
-	///////////////////////////////////////////////////////////////////////////
-	// define input ADIOS variables
-
-	adios2::Variable<int64_t> adios_connectivity = reader_io.InquireVariable<int64_t>(connectivity_name);
-
-	std::vector<adios2::Variable<double>> adios_coos(coo_names.size());
-	for (int i=0; i<coo_names.size(); i++)
-		adios_coos[i] = reader_io.InquireVariable<double>(coo_names[i]);
-
-	std::vector<adios2::Variable<double>> adios_vars(var_names.size());
-	for (int i=0; i<var_names.size(); i++)
-		adios_vars[i] = reader_io.InquireVariable<double>(var_names[i]);
 
 
 	///////////////////////////////////////////////////////////////////////////
@@ -166,6 +176,51 @@ int main(int argc, char *argv[])
 	for (int i=0; i<var_names.size(); i++)
 		out_adios_vars[i] = writer_io.DefineVariable<double>(var_names[i], {}, {}, {adios2::UnknownDim});
 
+	///////////////////////////////////////////////////////////////////////////
+
+
+	double total_time = 0;
+
+
+	// time stepping
+	while (true){
+
+
+	adios2::StepStatus read_status = bpReader.BeginStep(adios2::StepMode::Read, -1.0f);
+	size_t step = bpReader.CurrentStep();
+	if (step>config["max_step"] or read_status!=adios2::StepStatus::OK)
+		break;
+	bpWriter.BeginStep();
+
+
+	///////////////////////////////////////////////////////////////////////////
+	// define input ADIOS variables
+
+	adios2::Variable<int64_t> adios_connectivity = reader_io.InquireVariable<int64_t>(connectivity_name);
+
+	std::vector<adios2::Variable<double>> adios_coos(coo_names.size());
+	for (int i=0; i<coo_names.size(); i++)
+		adios_coos[i] = reader_io.InquireVariable<double>(coo_names[i]);
+
+	std::vector<adios2::Variable<double>> adios_vars(var_names.size());
+	for (int i=0; i<var_names.size(); i++)
+		adios_vars[i] = reader_io.InquireVariable<double>(var_names[i]);
+
+
+	// ///////////////////////////////////////////////////////////////////////////
+	// // define output ADIOS variables
+	// // adios2::Variable<size_t> inv_map_out = writer_io.DefineVariable<size_t>("inv_map", {}, {}, {adios2::UnknownDim});
+
+	// adios2::Variable<int64_t> out_adios_connectivity = writer_io.DefineVariable<int64_t>(connectivity_name, {}, {}, {adios2::UnknownDim});
+
+	// std::vector<adios2::Variable<double>> out_adios_coos(coo_names.size());
+	// for (int i=0; i<coo_names.size(); i++)
+	// 	out_adios_coos[i] = writer_io.DefineVariable<double>(coo_names[i], {}, {}, {adios2::UnknownDim});
+
+	// std::vector<adios2::Variable<double>> out_adios_vars(var_names.size());
+	// for (int i=0; i<var_names.size(); i++)
+	// 	out_adios_vars[i] = writer_io.DefineVariable<double>(var_names[i], {}, {}, {adios2::UnknownDim});
+
 
 	///////////////////////////////////////////////////////////////////////////
 	// reorder
@@ -177,7 +232,8 @@ int main(int argc, char *argv[])
 
 	int block_id = 0;
 	for (auto &block : blocks){
-		std::cout << "blockID = " << block.BlockID << " out of " << nblocks << std::endl;
+		auto start = std::chrono::high_resolution_clock::now();
+		std::cout << "step = " << step << ", blockID = " << block.BlockID << " out of " << nblocks << std::endl;
 
 		// allocate memory for reading variables
 		std::vector<int64_t> ElementConnectivity;
@@ -202,7 +258,7 @@ int main(int argc, char *argv[])
 		size_t num_nodes = coos[0].size();
 
 		// compute connectivity of the node graph
-		auto GlobalConnectivity = ComputeGlobalConnectivity(ElementConnectivity, num_nodes, config["num_nodes_in_bp_element"]);
+		auto GlobalConnectivity = ComputeGlobalConnectivity(ElementConnectivity, num_nodes, config["n_nodes_in_element"]);
 
 		// // print GlobalConnectivity
 		// for (int curr_node=0; curr_node<GlobalConnectivity.size(); curr_node++){
@@ -284,12 +340,10 @@ int main(int argc, char *argv[])
 		// set block/subregion for the variables
 		out_adios_connectivity.SetSelection(adios2::Box<adios2::Dims>({}, {ElementConnectivity.size()}));
 		bpWriter.Put<int64_t>(out_adios_connectivity, ElementConnectivity.data(), adios2::Mode::Sync);
-
 		for (int i=0; i<coo_names.size(); i++){
 			out_adios_coos[i].SetSelection(adios2::Box<adios2::Dims>({}, {coos[i].size()}));
 			bpWriter.Put<double>(out_adios_coos[i], reorder(coos[i],node_order).data(), adios2::Mode::Sync);
 		}
-
 		for (int i=0; i<var_names.size(); i++){
 			out_adios_vars[i].SetSelection(adios2::Box<adios2::Dims>({}, {vars[i].size()}));
 			bpWriter.Put<double>(out_adios_vars[i], reorder(vars[i],node_order).data(), adios2::Mode::Sync);
@@ -297,6 +351,16 @@ int main(int argc, char *argv[])
 
 		// inv_map_out.SetSelection(adios2::Box<adios2::Dims>({}, {serial_inv_map.size()})); bpWriter.Put<size_t>(inv_map_out, serial_inv_map.data(), adios2::Mode::Sync);
 		bpWriter.PerformPuts();
+
+
+		///////////////////////////////////////////////////////////////
+
+		auto end = std::chrono::high_resolution_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+		total_time += (double)duration.count() / 1e6;
+
+		std::cout << "\ttime = " << (double)duration.count() / 1e6 << " sec" << std::endl;
 
 		///////////////////////////////////////////////////////////////
 		// print original and reordered variables
@@ -339,6 +403,15 @@ int main(int argc, char *argv[])
 	}
 
 	bpReader.EndStep();	// end logical step
+	bpWriter.EndStep();	// end logical step
+	}
+
+
 	bpReader.Close();	// close engine
 	bpWriter.Close();	// close engine
+
+#if ADIOS2_USE_MPI
+	MPI_Finalize();
+#endif
+	return 0;
 }

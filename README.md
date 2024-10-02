@@ -3,6 +3,8 @@
 ## Build
 ```bash ./build.sh```
 
+## Config file
+
 ## Merge data
 ```./merge config.json input.bp output.bp```
 

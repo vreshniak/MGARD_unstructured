@@ -1,9 +1,14 @@
 adios-campaign
 json_test/
 build/
+output/
+to_delete/
 *.txt
 *.png
 *.py
+mgard_ge.cpp
+GE_QOI.cpp
+core
 extract_data
 merge
 reorder

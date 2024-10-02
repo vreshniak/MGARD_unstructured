@@ -104,6 +104,10 @@ int main(int argc, char *argv[])
 
 	double total_time = 0;
 
+	std::vector<double> original_size(var_names.size(), 0.0);
+	std::vector<double> compressed_size(var_names.size(), 0.0);
+	std::vector<double> rel_errors(var_names.size(), 0.0);
+
 
 	// time stepping
 	while (true){
@@ -133,9 +137,6 @@ int main(int argc, char *argv[])
 	///////////////////////////////////////////////////////////////////////////
 	// compress variables
 
-	std::vector<double> original_size(var_names.size(), 0.0);
-	std::vector<double> compressed_size(var_names.size(), 0.0);
-	std::vector<double> rel_errors(var_names.size(), 0.0);
 
 	// number of blocks/subdomains
 	auto blocks = bpReader.BlocksInfo(adios_connectivity, 0);
@@ -172,27 +173,27 @@ int main(int argc, char *argv[])
 		size_t N = coos[0].size();
 
 		// Coordinate array
-		// std::array<std::vector<DTYPE>, 1> mgard_coos;
-		// std::vector<DTYPE> &mgard_x = mgard_coos.at(0);
-		// mgard_x.reserve(N);
-		// mgard_x.push_back(0.0);
-		// double cumul_dst = 0;
-		// for (int i=1; i<N; i++){
-		// 	double dst = 0;
-		// 	for (auto &coo : coos)
-		// 		dst += (coo[i]-coo[i-1]) * (coo[i]-coo[i-1]);
-		// 	cumul_dst += std::sqrt(dst) + 1.e-10;
-		// 	// cumul_dst += 1;
-		// 	mgard_x.push_back(cumul_dst);
-		// }
-		// for (int i=0; i<N; i++){
-		// 	// mgard_x[i] /= mgard_x[N-1];
-		// 	mgard_x[i] = float(i)/(N-1);
-		// }
+		std::array<std::vector<DTYPE>, 1> mgard_coos;
+		std::vector<DTYPE> &mgard_x = mgard_coos.at(0);
+		mgard_x.reserve(N);
+		mgard_x.push_back(0.0);
+		double cumul_dst = 0;
+		for (int i=1; i<N; i++){
+			double dst = 0;
+			for (auto &coo : coos)
+				dst += (coo[i]-coo[i-1]) * (coo[i]-coo[i-1]);
+			cumul_dst += std::sqrt(dst) + 1.e-10;
+			// cumul_dst += 1;
+			mgard_x.push_back(cumul_dst);
+		}
+		for (int i=0; i<N; i++){
+			// mgard_x[i] /= mgard_x[N-1];
+			mgard_x[i] = float(i)/(N-1);
+		}
 
 		// wrap the information about the mesh into an `mgard::TensorMeshHierarchy`
-		// const mgard::TensorMeshHierarchy<1, DTYPE> hierarchy({N}, mgard_coos);
-		const mgard::TensorMeshHierarchy<1, DTYPE> hierarchy({N});
+		const mgard::TensorMeshHierarchy<1, DTYPE> hierarchy({N}, mgard_coos);
+		// const mgard::TensorMeshHierarchy<1, DTYPE> hierarchy({N});
 
 
 		//////////////////////////////////////////////////////////////////////////////////
@@ -323,7 +324,6 @@ int main(int argc, char *argv[])
 
 		std::cout << std::setprecision(3) << ", time = " << (double)duration.count() / 1e6 << " sec" << std::endl;
 
-
 		///////////////////////////////////////////////////////////////
 
 
@@ -331,7 +331,7 @@ int main(int argc, char *argv[])
 	}
 
 
-	// // print compression ratios
+	// print compression ratios
 	// for (int i=0; i<var_names.size(); i++) std::cout << var_names[i]     << " "; std::cout << std::endl;
 	// for (int i=0; i<var_names.size(); i++) std::cout << rel_errors[i]    << " "; std::cout << std::endl;
 	// for (int i=0; i<var_names.size(); i++) std::cout << original_size[i] << " ";
@@ -355,6 +355,9 @@ int main(int argc, char *argv[])
 	}
 
 
+	// std::cout << "\nTotal CR = " << std::setprecision(3)
+	// 		<< std::accumulate(original_size.begin(), original_size.end(), decltype(original_size)::value_type(0)) / std::accumulate(compressed_size.begin(), compressed_size.end(), decltype(compressed_size)::value_type(0))
+	// 		<< std::endl;
 	std::cout << "\nTotal time = " << std::setprecision(3) << total_time << std::endl;
 
 

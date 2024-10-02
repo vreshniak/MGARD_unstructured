@@ -60,9 +60,9 @@ int main(int argc, char *argv[])
 
 	// adios2::Variable<int64_t> out_adios_connectivity = writer_io.DefineVariable<int64_t>(connectivity_name, {}, {}, {adios2::UnknownDim});
 
-	// std::vector<adios2::Variable<double>> out_adios_coos(coo_names.size());
-	// for (int i=0; i<coo_names.size(); i++)
-	// 	out_adios_coos[i] = writer_io.DefineVariable<double>(coo_names[i], {}, {}, {adios2::UnknownDim});
+	std::vector<adios2::Variable<double>> out_adios_coos(coo_names.size());
+	for (int i=0; i<coo_names.size(); i++)
+		out_adios_coos[i] = writer_io.DefineVariable<double>(coo_names[i], {}, {}, {adios2::UnknownDim});
 
 	std::vector<adios2::Variable<double>> out_adios_vars(var_names.size());
 	for (int i=0; i<var_names.size(); i++)
@@ -79,17 +79,17 @@ int main(int argc, char *argv[])
 		std::cout << "blockID = " << block.BlockID << " out of " << nblocks << std::endl;
 
 		// allocate memory for reading variables
-		std::vector<int64_t> ElementConnectivity;
+		// std::vector<int64_t> ElementConnectivity;
 		std::vector<std::vector<double>> coos(coo_names.size());
 		std::vector<std::vector<double>> vars(var_names.size());
 
 		// set block/subregion for the variables
-		adios_connectivity.SetBlockSelection(block.BlockID);
+		// adios_connectivity.SetBlockSelection(block.BlockID);
 		for (auto &coo : adios_coos) coo.SetBlockSelection(block.BlockID);
 		for (auto &var : adios_vars) var.SetBlockSelection(block.BlockID);
 
 		// read variables
-		bpReader.Get(adios_connectivity, ElementConnectivity, adios2::Mode::Sync);
+		// bpReader.Get(adios_connectivity, ElementConnectivity, adios2::Mode::Sync);
 		for (int i=0; i<coo_names.size(); i++) bpReader.Get(adios_coos[i], coos[i], adios2::Mode::Sync);
 		for (int i=0; i<var_names.size(); i++) bpReader.Get(adios_vars[i], vars[i], adios2::Mode::Sync);
 		bpReader.PerformGets();
@@ -100,10 +100,10 @@ int main(int argc, char *argv[])
 		// set block/subregion for the variables
 		// out_adios_connectivity.SetSelection(adios2::Box<adios2::Dims>({}, {ElementConnectivity.size()}));
 		// bpWriter.Put<int64_t>(out_adios_connectivity, ElementConnectivity.data(), adios2::Mode::Sync);
-		// for (int i=0; i<coo_names.size(); i++){
-		// 	out_adios_coos[i].SetSelection(adios2::Box<adios2::Dims>({}, {coos[i].size()}));
-		// 	bpWriter.Put<double>(out_adios_coos[i], coos[i].data(), adios2::Mode::Sync);
-		// }
+		for (int i=0; i<coo_names.size(); i++){
+			out_adios_coos[i].SetSelection(adios2::Box<adios2::Dims>({}, {coos[i].size()}));
+			bpWriter.Put<double>(out_adios_coos[i], coos[i].data(), adios2::Mode::Sync);
+		}
 		for (int i=0; i<var_names.size(); i++){
 			out_adios_vars[i].SetSelection(adios2::Box<adios2::Dims>({}, {vars[i].size()}));
 			bpWriter.Put<double>(out_adios_vars[i], vars[i].data(), adios2::Mode::Sync);

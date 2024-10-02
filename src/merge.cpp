@@ -5,6 +5,9 @@
 #include <iostream>
 #include <fstream>
 
+#include <mpi.h>
+#include <chrono>
+
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -90,7 +93,6 @@ auto serialize_inv_map(std::map<size_t, std::vector<size_t>> &inv_map, size_t n)
 }
 
 
-
 template <typename T>
 auto merge_values(std::vector<std::vector<size_t>> &inv_map, std::vector<T> &values)
 -> std::vector<T>
@@ -108,9 +110,46 @@ auto merge_values(std::vector<std::vector<size_t>> &inv_map, std::vector<T> &val
 }
 
 
+// auto adjacency_matrix(std::vector<int64_t> &connectivity, int nnodes)
+// -> std::map<int64_t, std::set<size_t>>
+// {
+// 	std::map<int64_t, std::vector<int64_t>> adj_mat;
+
+// 	// for (size_t el=0; el<connectivity.size()/nnodes; el++){
+// 	for (size_t i=0; i<connectivity.size(); i+=nnodes){
+// 		for (size_t j=i; j<nnodes; j++){
+// 			adj_mat[i].insert(j);
+// 			adj_mat[j].insert(i);
+// 		}
+// 	}
+
+// 	return adj_mat;
+// }
+
+
 
 int main(int argc, char *argv[])
 {
+	///////////////////////////////////////////////////////////////////////////
+	// MPI
+
+	int rank, nranks;
+#if ADIOS2_USE_MPI
+	int provided;
+
+	// MPI_THREAD_MULTIPLE is only required if you enable the SST MPI_DP
+	MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+#else
+	rank = 0;
+	nranks = 1;
+#endif
+
+
+	///////////////////////////////////////////////////////////////////////////
+	// config
+
 	// read config file
 	if (argc<4){
 		std::cerr << "Config JSON file is required as input" << std::endl;
@@ -127,7 +166,11 @@ int main(int argc, char *argv[])
 
 
 	// setup ADIOS readers/writers
+#if ADIOS2_USE_MPI
+	adios2::ADIOS adios(MPI_COMM_WORLD);
+#else
 	adios2::ADIOS adios;
+#endif
 	adios2::IO reader_io = adios.DeclareIO("BPReader");
 	adios2::IO writer_io = adios.DeclareIO("BPWriter");
 	reader_io.SetEngine("BPFile");
@@ -136,11 +179,37 @@ int main(int argc, char *argv[])
 	adios2::Engine bpWriter = writer_io.Open(argv[3], adios2::Mode::Write);
 
 
-	// // ADIOS compression
-	// adios2::Operator op = adios.DefineOperator("mgardplus", "mgardplus");
+	///////////////////////////////////////////////////////////////////////////
+	// define output ADIOS variables
+	// adios2::Variable<size_t> inv_map_out = writer_io.DefineVariable<size_t>("inv_map", {}, {}, {adios2::UnknownDim});
 
+	adios2::Variable<int64_t> out_adios_connectivity = writer_io.DefineVariable<int64_t>(connectivity_name, {}, {}, {adios2::UnknownDim});
+
+	std::vector<adios2::Variable<double>> out_adios_coos(coo_names.size());
+	for (int i=0; i<coo_names.size(); i++)
+		out_adios_coos[i] = writer_io.DefineVariable<double>(coo_names[i], {}, {}, {adios2::UnknownDim});
+
+	std::vector<adios2::Variable<double>> out_adios_vars(var_names.size());
+	for (int i=0; i<var_names.size(); i++)
+		out_adios_vars[i] = writer_io.DefineVariable<double>(var_names[i], {}, {}, {adios2::UnknownDim});
+
+	///////////////////////////////////////////////////////////////////////////
+
+
+	size_t total_nodes = 0;
+	size_t total_unique_nodes = 0;
+	double total_time = 0;
+
+
+	// time stepping
+	while (true){
 
 	adios2::StepStatus read_status = bpReader.BeginStep(adios2::StepMode::Read, -1.0f);
+	size_t step = bpReader.CurrentStep();
+	if (step>config["max_step"] or read_status!=adios2::StepStatus::OK)
+		break;
+	bpWriter.BeginStep();
+
 
 
 	///////////////////////////////////////////////////////////////////////////
@@ -158,21 +227,6 @@ int main(int argc, char *argv[])
 
 
 	///////////////////////////////////////////////////////////////////////////
-	// define output ADIOS variables
-	// adios2::Variable<size_t> inv_map_out = writer_io.DefineVariable<size_t>("inv_map", {}, {}, {adios2::UnknownDim});
-
-	adios2::Variable<int64_t> out_adios_connectivity = writer_io.DefineVariable<int64_t>(connectivity_name, {}, {}, {adios2::UnknownDim});
-
-	std::vector<adios2::Variable<double>> out_adios_coos(coo_names.size());
-	for (int i=0; i<coo_names.size(); i++)
-		out_adios_coos[i] = writer_io.DefineVariable<double>(coo_names[i], {}, {}, {adios2::UnknownDim});
-
-	std::vector<adios2::Variable<double>> out_adios_vars(var_names.size());
-	for (int i=0; i<var_names.size(); i++)
-		out_adios_vars[i] = writer_io.DefineVariable<double>(var_names[i], {}, {}, {adios2::UnknownDim});
-
-
-	///////////////////////////////////////////////////////////////////////////
 
 
 	// number of blocks/subdomains
@@ -180,7 +234,8 @@ int main(int argc, char *argv[])
 	size_t nblocks = blocks.size();
 
 	for (auto &block : blocks){
-		std::cout << "blockID = " << block.BlockID << " out of " << nblocks << std::endl;
+		auto start = std::chrono::high_resolution_clock::now();
+		std::cout << "step = " << step << ", blockID = " << block.BlockID << " out of " << nblocks << std::endl;
 
 		// allocate memory for reading variables
 		std::vector<int64_t> ElementConnectivity;
@@ -212,17 +267,28 @@ int main(int argc, char *argv[])
 		// auto serial_inv_map = serialize_inv_map(inv_map, coos[0].size());
 
 		// reindex dofs to unique indices
-		for(size_t i = 0; i < ElementConnectivity.size(); i++)
+		for(size_t i = 0; i < ElementConnectivity.size(); i++){
 			ElementConnectivity[i] = ind_map[ElementConnectivity[i]];
+		}
+
 		// // print Element Connectivity
 		// {
-		// std::cout << "\tElement Connectivity:" << std::endl;
-		// int nnodes = config["num_nodes_in_bp_element"];
+		// std::cout << "Element Connectivity:" << std::endl;
+		// int nnodes = config["n_nodes_in_element"];
 		// for (int i=0; i<10*nnodes; i+=nnodes)
 		// {
 		// 	for (int j=0; j<nnodes; j++) std::cout << " " << ElementConnectivity[i+j];
 		// 	std::cout << std::endl;
 		// }
+		// }
+		// return 0;
+
+		// // print variable at duplicate nodes
+		// for (int vari=0; vari<vars.size(); vari++){
+		// 	for (int i=0; i<inv_map[0].size(); i++){
+		// 		std::cout << vars[vari][inv_map[0][i]] << " ";
+		// 	}
+		// 	std::cout << std::endl;
 		// }
 		// return 0;
 
@@ -235,6 +301,9 @@ int main(int argc, char *argv[])
 
 		for (int i=0; i<coo_names.size(); i++) merged_coos[i] = merge_values(inv_map, coos[i]);
 		for (int i=0; i<var_names.size(); i++) merged_vars[i] = merge_values(inv_map, vars[i]);
+		for (int i=0; i<var_names.size(); i++)
+			for (int j=0; j<merged_vars[i].size(); j++)
+		 		merged_vars[i][j] = j;
 
 
 		//////////////////////////////////////////////////////////////////////////////////
@@ -258,8 +327,17 @@ int main(int argc, char *argv[])
 
 		///////////////////////////////////////////////////////////////
 
-		std::cout << "\tNum. orig. points = " << coos[0].size() << std::endl;
-		std::cout << "\tNum. uniq. points = " << inv_map.size() << std::endl;
+		auto end = std::chrono::high_resolution_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+		total_nodes += coos[0].size();
+		total_unique_nodes += inv_map.size();
+		total_time += (double)duration.count() / 1e6;
+
+		std::cout << "\tNum. orig./uniq. nodes = " << coos[0].size() << " / " << inv_map.size()
+				<< std::setprecision(3)
+				<< ", redundancy = " <<  (double)coos[0].size()/(double)inv_map.size()
+				<< ", time = " << (double)duration.count() / 1e6 << " sec" << std::endl;
 
 		// // print inverse map
 		// {
@@ -299,6 +377,19 @@ int main(int argc, char *argv[])
 	}
 
 	bpReader.EndStep();	// end logical step
+	bpWriter.EndStep();	// end logical step
+	}
+
+	std::cout << "Total num. orig. points = " << total_nodes << std::endl;
+	std::cout << "Total num. uniq. points = " << total_unique_nodes << std::endl;
+	std::cout << "Total time = " << std::setprecision(3) << total_time << std::endl;
+
 	bpReader.Close();	// close engine
 	bpWriter.Close();	// close engine
+
+
+#if ADIOS2_USE_MPI
+	MPI_Finalize();
+#endif
+	return 0;
 }

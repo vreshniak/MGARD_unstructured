@@ -204,7 +204,16 @@ int main(int argc, char *argv[])
 		// compute connectivity of the node graph
 		auto GlobalConnectivity = ComputeGlobalConnectivity(ElementConnectivity, num_nodes, config["num_nodes_in_bp_element"]);
 
-		auto node_order  = find_node_order(GlobalConnectivity, coos);
+		// // print GlobalConnectivity
+		// for (int curr_node=0; curr_node<GlobalConnectivity.size(); curr_node++){
+		// 	std::cout << curr_node << " ";
+		// 	for (const auto & n : GlobalConnectivity[curr_node])
+		// 		std::cout << n << " ";
+		// 	std::cout << std::endl;
+		// }
+		// return 0;
+
+		auto node_order = find_node_order(GlobalConnectivity, coos);
 
 		// std::vector<bool>   node_notvisited(num_nodes, true);
 		// std::vector<size_t> node_order(num_nodes, 0);
@@ -290,15 +299,38 @@ int main(int argc, char *argv[])
 		bpWriter.PerformPuts();
 
 		///////////////////////////////////////////////////////////////
+		// print original and reordered variables
 
 		// for (size_t i=0; i<50000; i++)
-		// 	std::cout << vars[1][i] << " ";
+		// 	std::cout << vars[0][i] << " ";
 		// std::cout << std::endl;
 
-		// std::vector<double> reordered_var = reorder(vars[1],node_order);
+		// std::vector<double> reordered_var = reorder(vars[0],node_order);
 		// for (size_t i=0; i<50000; i++)
 		// 	std::cout << reordered_var[i] << " ";
 		// std::cout << std::endl;
+
+		// return 0;
+
+		///////////////////////////////////////////////////////////////
+		// print original and reordered coordinates
+
+		// for (int coo=0; coo<3; coo++){
+		// 	for (size_t i=0; i<50000; i++)
+		// 		std::cout << coos[coo][i] << " ";
+		// 	std::cout << std::endl;
+		// }
+		// std::cout << std::endl;
+
+		// for (int coo=0; coo<3; coo++){
+		// 	std::vector<double> reordered_coo = reorder(coos[coo],node_order);
+		// 	for (size_t i=0; i<50000; i++)
+		// 		std::cout << reordered_coo[i] << " ";
+		// 	std::cout << std::endl;
+		// }
+		// std::cout << std::endl;
+
+		// return 0;
 
 		///////////////////////////////////////////////////////////////
 

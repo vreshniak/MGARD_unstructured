@@ -95,11 +95,7 @@ int main(int argc, char *argv[])
 
 	std::vector<adios2::Variable<DTYPE>> out_adios_vars(var_names.size());
 	for (int i=0; i<var_names.size(); i++){
-		// double abs_tol = rel_tol * (adios_vars[i].Max()-adios_vars[i].Min());
-		// abs_tol = std::max(1.e-6, rel_tol * (adios_vars[i].Max()-adios_vars[i].Min()));
 		out_adios_vars[i] = writer_io.DefineVariable<DTYPE>(var_names[i], {}, {}, {adios2::UnknownDim});
-		// out_adios_vars[i].AddOperation(op, {{"accuracy", std::to_string(abs_tol)}, {"mode", "ABS"}});
-		// std::cout << abs_tol << std::endl;
 	}
 
 	///////////////////////////////////////////////////////////////////////////

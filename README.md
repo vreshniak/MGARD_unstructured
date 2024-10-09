@@ -5,6 +5,8 @@
 
 ## Config file
 
+Description goes here
+
 ## Merge data
 ```./merge config.json input.bp output.bp```
 

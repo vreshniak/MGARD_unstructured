@@ -8,8 +8,9 @@
 #include <mpi.h>
 #include <chrono>
 
-#include <nlohmann/json.hpp>
+#include "serialization.hpp"
 
+#include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
 

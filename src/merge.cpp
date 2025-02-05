@@ -1,3 +1,13 @@
+/*
+ * merge.cpp :
+ *
+ *  Created on: October 2, 2024
+ *      Author: Viktor Reshniak
+ *
+ *	Merge DG data to make it continuous, this results in reindexing DOFs
+ */
+
+
 #include <adios2.h>
 #include <vector>
 #include <algorithm>    // std::find

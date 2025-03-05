@@ -1,0 +1,4 @@
+ADIOS2_DIR=/ccs/home/reshniakv/libs_frontier/adios
+MGARD_DIR=/ccs/home/reshniakv/MGARD/install-hip-frontier
+
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="${ADIOS2_DIR};${MGARD_DIR}"

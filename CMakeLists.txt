@@ -13,6 +13,25 @@ find_package(ADIOS2 PATHS /ccs/home/reshniakv/libs_frontier/adios/lib64 REQUIRED
 # check for MGARD
 find_package(mgard PATHS /ccs/home/reshniakv/MGARD/install-hip-frontier REQUIRED COMPONENTS CXX)
 
+# find_package(OpenMP)
+
+# find_package(zstd PATHS /ccs/home/reshniakv/MGARD/install-hip-frontier/lib/cmake/zstd/ REQUIRED)
+
+
+find_package(PkgConfig)
+# pkg_check_modules(ZSTD REQUIRED IMPORTED_TARGET GLOBAL zstd)
+pkg_search_module(ZSTD IMPORTED_TARGET libzstd)
+
+find_package(zfp PATHS /ccs/home/reshniakv/libs_frontier/zfp/lib64)
+
+find_package(SZ3 REQUIRED PATHS /ccs/home/reshniakv/libs_frontier/sz3)
+# find_package(SZ3 REQUIRED PATHS /lustre/orion/csc143/scratch/gongq/frontier/SoftwareDev/SZ3/install/usr/local/lib64/cmake/SZ3/)
+# set(SZ3_INCLUDES  "/ccs/home/reshniakv/libs_frontier/sz3/include")
+# set(ZSTD_INCLUDES "/ccs/home/reshniakv/MGARD/install-hip-frontier/include/")
+
+
+
+
 
 # Collect list of all source files
 #==================================================================================================
@@ -26,18 +45,37 @@ set(SRC_MERGE_FILES
 set(SRC_REORDER_FILES
 	src/reorder.cpp
 )
+set(SRC_ADD_REORDER_FILES
+	src/add_ordering.cpp
+)
+set(SRC_MAKE_REORDER_FILES
+	src/make_ordering.cpp
+)
 set(SRC_COMPRESS_MGARD_FILES
 	src/compress_mgard.cpp
+)
+set(SRC_COMPRESS_MGARD_SORT_FILES
+	src/compress_mgard_sort.cpp
 )
 set(SRC_COMPRESS_ADIOS_FILES
 	src/compress_adios.cpp
 )
+set(SRC_COMPRESS_ADIOS_PLUGIN_FILES
+	src/compress_adios_with_plugin.cpp
+)
+set(SRC_COMPRESS_ZFP_FILES
+	src/compress_zfp.cpp
+)
+set(SRC_COMPRESS_SZ_FILES
+	src/compress_sz.cpp
+)
+
 
 add_definitions(-DOMPI_SKIP_MPICXX -DMPICH_SKIP_MPICXX)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_executable(extract_data ${SRC_DATA_FILES})
-target_include_directories(extract_data PRIVATE include)
+target_include_directories(extract_data PRIVATE include src)
 target_link_libraries(extract_data PRIVATE adios2::cxx11_mpi MPI::MPI_CXX)
 
 add_executable(merge ${SRC_MERGE_FILES})
@@ -48,10 +86,34 @@ add_executable(reorder ${SRC_REORDER_FILES})
 target_include_directories(reorder PRIVATE include)
 target_link_libraries(reorder PRIVATE adios2::cxx11_mpi MPI::MPI_CXX)
 
+add_executable(add_ordering ${SRC_ADD_REORDER_FILES})
+target_include_directories(add_ordering PRIVATE include)
+target_link_libraries(add_ordering PRIVATE adios2::cxx11_mpi MPI::MPI_CXX)
+
+add_executable(make_ordering ${SRC_MAKE_REORDER_FILES})
+target_include_directories(make_ordering PRIVATE include)
+target_link_libraries(make_ordering PRIVATE adios2::cxx11_mpi MPI::MPI_CXX)
+
 add_executable(compress_mgard ${SRC_COMPRESS_MGARD_FILES})
 target_include_directories(compress_mgard PRIVATE include)
 target_link_libraries(compress_mgard PRIVATE adios2::cxx11_mpi mgard::mgard MPI::MPI_CXX)
 
+add_executable(compress_mgard_sort ${SRC_COMPRESS_MGARD_SORT_FILES})
+target_include_directories(compress_mgard_sort PRIVATE include)
+target_link_libraries(compress_mgard_sort PRIVATE adios2::cxx11_mpi mgard::mgard MPI::MPI_CXX)
+
 add_executable(compress_adios ${SRC_COMPRESS_ADIOS_FILES})
 target_include_directories(compress_adios PRIVATE include)
 target_link_libraries(compress_adios PRIVATE adios2::cxx11_mpi mgard::mgard MPI::MPI_CXX)
+
+add_executable(compress_adios_plugin ${SRC_COMPRESS_ADIOS_PLUGIN_FILES})
+target_include_directories(compress_adios_plugin PRIVATE include)
+target_link_libraries(compress_adios_plugin PRIVATE adios2::cxx11_mpi mgard::mgard MPI::MPI_CXX)
+
+add_executable(compress_zfp ${SRC_COMPRESS_ZFP_FILES})
+target_include_directories(compress_zfp PRIVATE include)
+target_link_libraries(compress_zfp PRIVATE adios2::cxx11_mpi mgard::mgard zfp::zfp MPI::MPI_CXX)
+
+add_executable(compress_sz ${SRC_COMPRESS_SZ_FILES})
+target_include_directories(compress_sz PRIVATE include)
+target_link_libraries(compress_sz PRIVATE adios2::cxx11_mpi mgard::mgard zfp::zfp SZ3::SZ3 MPI::MPI_CXX INTERFACE PkgConfig::ZSTD)

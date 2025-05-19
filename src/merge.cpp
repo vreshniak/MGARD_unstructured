@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 
 	// read config file
 	if (argc<4){
-		std::cerr << "Config JSON file is required as input" << std::endl;
+		std::cerr << "Usage: merge config.json orig.bp merged.bp, merge got " << argc-1 << " parameters" << std::endl;
 		return -1;
 	}
 	std::ifstream f(argv[1]);

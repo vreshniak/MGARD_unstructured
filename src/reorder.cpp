@@ -144,7 +144,7 @@ int main(int argc, char *argv[])
 
 	// read config file
 	if (argc<4){
-		std::cerr << "Usage: merge config.json orig.bp merged.bp, merge got " << argc-1 << " parameters" << std::endl;
+		std::cerr << "Usage: reorder config.json orig.bp merged.bp, reorder got " << argc-1 << " parameters" << std::endl;
 		return -1;
 	}
 	std::string config_file_name = argv[1];

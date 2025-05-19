@@ -1,3 +1,13 @@
+/*
+ * reorder.cpp :
+ *
+ *  Created on: October 2, 2024
+ *      Author: Viktor Reshniak
+ *
+ *	Reorder serialized DOFs
+ */
+
+
 #include <adios2.h>
 #include <vector>
 #include <algorithm>    // std::find
@@ -9,8 +19,11 @@
 #include <chrono>
 
 #include <nlohmann/json.hpp>
-
 using json = nlohmann::json;
+
+
+bool verbose = true;
+
 
 
 /**
@@ -131,10 +144,14 @@ int main(int argc, char *argv[])
 
 	// read config file
 	if (argc<4){
-		std::cerr << "Config JSON file is required as input" << std::endl;
+		std::cerr << "Usage: merge config.json orig.bp merged.bp, merge got " << argc-1 << " parameters" << std::endl;
 		return -1;
 	}
-	std::ifstream f(argv[1]);
+	std::string config_file_name = argv[1];
+	std::string input_file_name  = argv[2];
+	std::string merged_file_name = argv[3];
+
+	std::ifstream f(config_file_name);
 	json config = json::parse(f);
 
 
@@ -154,8 +171,8 @@ int main(int argc, char *argv[])
 	adios2::IO writer_io = adios.DeclareIO("BPWriter");
 	reader_io.SetEngine("BPFile");
 	writer_io.SetEngine("BPFile");
-	adios2::Engine bpReader = reader_io.Open(argv[2], adios2::Mode::Read);
-	adios2::Engine bpWriter = writer_io.Open(argv[3], adios2::Mode::Write);
+	adios2::Engine bpReader = reader_io.Open(input_file_name,  adios2::Mode::Read);
+	adios2::Engine bpWriter = writer_io.Open(merged_file_name, adios2::Mode::Write);
 
 
 	// // ADIOS compression
@@ -185,162 +202,161 @@ int main(int argc, char *argv[])
 	// time stepping
 	while (true){
 
-
-	adios2::StepStatus read_status = bpReader.BeginStep(adios2::StepMode::Read, -1.0f);
-	size_t step = bpReader.CurrentStep();
-	if (step>config["max_step"] or read_status!=adios2::StepStatus::OK)
-		break;
-	bpWriter.BeginStep();
-
-
-	///////////////////////////////////////////////////////////////////////////
-	// define input ADIOS variables
-
-	adios2::Variable<int64_t> adios_connectivity = reader_io.InquireVariable<int64_t>(connectivity_name);
-
-	std::vector<adios2::Variable<double>> adios_coos(coo_names.size());
-	for (int i=0; i<coo_names.size(); i++)
-		adios_coos[i] = reader_io.InquireVariable<double>(coo_names[i]);
-
-	std::vector<adios2::Variable<double>> adios_vars(var_names.size());
-	for (int i=0; i<var_names.size(); i++)
-		adios_vars[i] = reader_io.InquireVariable<double>(var_names[i]);
+		adios2::StepStatus read_status = bpReader.BeginStep(adios2::StepMode::Read, -1.0f);
+		size_t step = bpReader.CurrentStep();
+		if (step>config["max_step"] or read_status!=adios2::StepStatus::OK)
+			break;
+		bpWriter.BeginStep();
 
 
-	///////////////////////////////////////////////////////////////////////////
-	// reorder
+		///////////////////////////////////////////////////////////////////////////
+		// define input ADIOS variables
+
+		adios2::Variable<int64_t> adios_connectivity = reader_io.InquireVariable<int64_t>(connectivity_name);
+
+		std::vector<adios2::Variable<double>> adios_coos(coo_names.size());
+		for (int i=0; i<coo_names.size(); i++)
+			adios_coos[i] = reader_io.InquireVariable<double>(coo_names[i]);
+
+		std::vector<adios2::Variable<double>> adios_vars(var_names.size());
+		for (int i=0; i<var_names.size(); i++)
+			adios_vars[i] = reader_io.InquireVariable<double>(var_names[i]);
 
 
-	// number of blocks/subdomains
-	auto blocks = bpReader.BlocksInfo(adios_connectivity, 0);
-	size_t nblocks = blocks.size();
-
-	int block_id = 0;
-	for (auto &block : blocks){
-		auto start = std::chrono::high_resolution_clock::now();
-		std::cout << "step = " << step << ", blockID = " << block.BlockID << " out of " << nblocks << std::endl;
-
-		// allocate memory for reading variables
-		std::vector<int64_t> ElementConnectivity;
-		std::vector<std::vector<double>> coos(coo_names.size());
-		std::vector<std::vector<double>> vars(var_names.size());
-
-		// set block/subregion for the variables
-		adios_connectivity.SetBlockSelection(block.BlockID);
-		for (auto &coo : adios_coos) coo.SetBlockSelection(block.BlockID);
-		for (auto &var : adios_vars) var.SetBlockSelection(block.BlockID);
-
-		// read variables
-		bpReader.Get(adios_connectivity, ElementConnectivity, adios2::Mode::Sync);
-		for (int i=0; i<coo_names.size(); i++) bpReader.Get(adios_coos[i], coos[i], adios2::Mode::Sync);
-		for (int i=0; i<var_names.size(); i++) bpReader.Get(adios_vars[i], vars[i], adios2::Mode::Sync);
-		bpReader.PerformGets();
+		///////////////////////////////////////////////////////////////////////////
+		// reorder
 
 
-		//////////////////////////////////////////////////////////////////////////////////
-		// reordering
+		// number of blocks/subdomains
+		auto blocks = bpReader.BlocksInfo(adios_connectivity, 0);
+		size_t nblocks = blocks.size();
 
-		size_t num_nodes = coos[0].size();
+		int block_id = 0;
+		for (auto &block : blocks){
+			auto start = std::chrono::high_resolution_clock::now();
+			std::cout << "step = " << step << ", blockID = " << block.BlockID << " out of " << nblocks << std::endl;
 
-		// compute connectivity of the node graph
-		auto GlobalConnectivity = ComputeGlobalConnectivity(ElementConnectivity, num_nodes, config["n_nodes_in_element"]);
+			// allocate memory for reading variables
+			std::vector<int64_t> ElementConnectivity;
+			std::vector<std::vector<double>> coos(coo_names.size());
+			std::vector<std::vector<double>> vars(var_names.size());
 
-		// // print GlobalConnectivity
-		// for (int curr_node=0; curr_node<GlobalConnectivity.size(); curr_node++){
-		// 	std::cout << curr_node << " ";
-		// 	for (const auto & n : GlobalConnectivity[curr_node])
-		// 		std::cout << n << " ";
-		// 	std::cout << std::endl;
-		// }
-		// return 0;
+			// set block/subregion for the variables
+			adios_connectivity.SetBlockSelection(block.BlockID);
+			for (auto &coo : adios_coos) coo.SetBlockSelection(block.BlockID);
+			for (auto &var : adios_vars) var.SetBlockSelection(block.BlockID);
 
-		auto node_order = find_node_order(GlobalConnectivity, coos);
-
-		// for (int i=0; i<10; i++)
-		// 	std::cout << node_order[i] << " ";
-		// std::cout << std::endl;
-
-		std::vector<size_t> reorder_map(node_order.size());
-		for (size_t i=0; i<reorder_map.size(); i++)
-			reorder_map[node_order[i]] = i;
-
-		for (size_t i=0; i<ElementConnectivity.size(); i++)
-			ElementConnectivity[i] = reorder_map[ElementConnectivity[i]];
+			// read variables
+			bpReader.Get(adios_connectivity, ElementConnectivity, adios2::Mode::Sync);
+			for (int i=0; i<coo_names.size(); i++) bpReader.Get(adios_coos[i], coos[i], adios2::Mode::Sync);
+			for (int i=0; i<var_names.size(); i++) bpReader.Get(adios_vars[i], vars[i], adios2::Mode::Sync);
+			bpReader.PerformGets();
 
 
-		//////////////////////////////////////////////////////////////////////////////////
-		// save reordered variables
+			//////////////////////////////////////////////////////////////////////////////////
+			// reordering
 
-		// double abs_tol = 1.e-3;
-		// RHE_out.AddOperation(op, {{"accuracy", std::to_string(abs_tol)}, {"mode", "ABS"}});
+			size_t num_nodes = coos[0].size();
 
-		// set block/subregion for the variables
-		out_adios_connectivity.SetSelection(adios2::Box<adios2::Dims>({}, {ElementConnectivity.size()}));
-		bpWriter.Put<int64_t>(out_adios_connectivity, ElementConnectivity.data(), adios2::Mode::Sync);
-		for (int i=0; i<coo_names.size(); i++){
-			out_adios_coos[i].SetSelection(adios2::Box<adios2::Dims>({}, {coos[i].size()}));
-			bpWriter.Put<double>(out_adios_coos[i], reorder(coos[i],node_order).data(), adios2::Mode::Sync);
+			// compute connectivity of the node graph
+			auto GlobalConnectivity = ComputeGlobalConnectivity(ElementConnectivity, num_nodes, config["n_nodes_in_element"]);
+
+			// // print GlobalConnectivity
+			// for (int curr_node=0; curr_node<GlobalConnectivity.size(); curr_node++){
+			// 	std::cout << curr_node << " ";
+			// 	for (const auto & n : GlobalConnectivity[curr_node])
+			// 		std::cout << n << " ";
+			// 	std::cout << std::endl;
+			// }
+			// return 0;
+
+			auto node_order = find_node_order(GlobalConnectivity, coos);
+
+			// for (int i=0; i<10; i++)
+			// 	std::cout << node_order[i] << " ";
+			// std::cout << std::endl;
+
+			std::vector<size_t> reorder_map(node_order.size());
+			for (size_t i=0; i<reorder_map.size(); i++)
+				reorder_map[node_order[i]] = i;
+
+			for (size_t i=0; i<ElementConnectivity.size(); i++)
+				ElementConnectivity[i] = reorder_map[ElementConnectivity[i]];
+
+
+			//////////////////////////////////////////////////////////////////////////////////
+			// save reordered variables
+
+			// double abs_tol = 1.e-3;
+			// RHE_out.AddOperation(op, {{"accuracy", std::to_string(abs_tol)}, {"mode", "ABS"}});
+
+			// set block/subregion for the variables
+			out_adios_connectivity.SetSelection(adios2::Box<adios2::Dims>({}, {ElementConnectivity.size()}));
+			bpWriter.Put<int64_t>(out_adios_connectivity, ElementConnectivity.data(), adios2::Mode::Sync);
+			for (int i=0; i<coo_names.size(); i++){
+				out_adios_coos[i].SetSelection(adios2::Box<adios2::Dims>({}, {coos[i].size()}));
+				bpWriter.Put<double>(out_adios_coos[i], reorder(coos[i],node_order).data(), adios2::Mode::Sync);
+			}
+			for (int i=0; i<var_names.size(); i++){
+				out_adios_vars[i].SetSelection(adios2::Box<adios2::Dims>({}, {vars[i].size()}));
+				bpWriter.Put<double>(out_adios_vars[i], reorder(vars[i],node_order).data(), adios2::Mode::Sync);
+			}
+
+			// inv_map_out.SetSelection(adios2::Box<adios2::Dims>({}, {serial_inv_map.size()})); bpWriter.Put<size_t>(inv_map_out, serial_inv_map.data(), adios2::Mode::Sync);
+			bpWriter.PerformPuts();
+
+
+			///////////////////////////////////////////////////////////////
+
+			auto end = std::chrono::high_resolution_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+			total_time += (double)duration.count() / 1e6;
+
+			std::cout << "\ttime = " << (double)duration.count() / 1e6 << " sec" << std::endl;
+
+			///////////////////////////////////////////////////////////////
+			// print original and reordered variables
+
+			// for (size_t i=0; i<50000; i++)
+			// 	std::cout << vars[0][i] << " ";
+			// std::cout << std::endl;
+
+			// std::vector<double> reordered_var = reorder(vars[0],node_order);
+			// for (size_t i=0; i<50000; i++)
+			// 	std::cout << reordered_var[i] << " ";
+			// std::cout << std::endl;
+
+			// return 0;
+
+			///////////////////////////////////////////////////////////////
+			// print original and reordered coordinates
+
+			// for (int coo=0; coo<3; coo++){
+			// 	for (size_t i=0; i<50000; i++)
+			// 		std::cout << coos[coo][i] << " ";
+			// 	std::cout << std::endl;
+			// }
+			// std::cout << std::endl;
+
+			// for (int coo=0; coo<3; coo++){
+			// 	std::vector<double> reordered_coo = reorder(coos[coo],node_order);
+			// 	for (size_t i=0; i<50000; i++)
+			// 		std::cout << reordered_coo[i] << " ";
+			// 	std::cout << std::endl;
+			// }
+			// std::cout << std::endl;
+
+			// return 0;
+
+			///////////////////////////////////////////////////////////////
+
+
+			if (config["max_block_id"]>=0 and block_id++>=config["max_block_id"]) break;
 		}
-		for (int i=0; i<var_names.size(); i++){
-			out_adios_vars[i].SetSelection(adios2::Box<adios2::Dims>({}, {vars[i].size()}));
-			bpWriter.Put<double>(out_adios_vars[i], reorder(vars[i],node_order).data(), adios2::Mode::Sync);
-		}
 
-		// inv_map_out.SetSelection(adios2::Box<adios2::Dims>({}, {serial_inv_map.size()})); bpWriter.Put<size_t>(inv_map_out, serial_inv_map.data(), adios2::Mode::Sync);
-		bpWriter.PerformPuts();
-
-
-		///////////////////////////////////////////////////////////////
-
-		auto end = std::chrono::high_resolution_clock::now();
-		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-		total_time += (double)duration.count() / 1e6;
-
-		std::cout << "\ttime = " << (double)duration.count() / 1e6 << " sec" << std::endl;
-
-		///////////////////////////////////////////////////////////////
-		// print original and reordered variables
-
-		// for (size_t i=0; i<50000; i++)
-		// 	std::cout << vars[0][i] << " ";
-		// std::cout << std::endl;
-
-		// std::vector<double> reordered_var = reorder(vars[0],node_order);
-		// for (size_t i=0; i<50000; i++)
-		// 	std::cout << reordered_var[i] << " ";
-		// std::cout << std::endl;
-
-		// return 0;
-
-		///////////////////////////////////////////////////////////////
-		// print original and reordered coordinates
-
-		// for (int coo=0; coo<3; coo++){
-		// 	for (size_t i=0; i<50000; i++)
-		// 		std::cout << coos[coo][i] << " ";
-		// 	std::cout << std::endl;
-		// }
-		// std::cout << std::endl;
-
-		// for (int coo=0; coo<3; coo++){
-		// 	std::vector<double> reordered_coo = reorder(coos[coo],node_order);
-		// 	for (size_t i=0; i<50000; i++)
-		// 		std::cout << reordered_coo[i] << " ";
-		// 	std::cout << std::endl;
-		// }
-		// std::cout << std::endl;
-
-		// return 0;
-
-		///////////////////////////////////////////////////////////////
-
-
-		if (config["max_block_id"]>=0 and block_id++>=config["max_block_id"]) break;
-	}
-
-	bpReader.EndStep();	// end logical step
-	bpWriter.EndStep();	// end logical step
+		bpReader.EndStep();	// end logical step
+		bpWriter.EndStep();	// end logical step
 	}
 
 	std::cout << "Total time = " << std::setprecision(3) << total_time << std::endl;

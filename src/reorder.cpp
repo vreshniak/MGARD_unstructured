@@ -64,6 +64,14 @@ auto reorder(const std::vector<T> &vec, const std::vector<size_t> &order)
 }
 
 
+/**
+ * Calculate inverse index map: unique index of the node -> all indices of this node
+ *
+ * Inputs:
+ * ------
+ *  GlobalConnectivity - node connectivity: node id -> connected ids
+ * 	coos - vector of x-y-z coordinate vectors
+ */
 template <typename Container>
 auto find_node_order(const std::vector<std::set<size_t>> &GlobalConnectivity, const Container &coos)
 -> std::vector<size_t>
@@ -72,13 +80,19 @@ auto find_node_order(const std::vector<std::set<size_t>> &GlobalConnectivity, co
 
 	std::vector<bool>   node_notvisited(num_nodes, true);
 	std::vector<size_t> node_order(num_nodes, 0);
+
+	// start with first node
 	node_notvisited[0] = false;
 	size_t curr_node = 0;
 	size_t node_num_visited = 1;
+	size_t notvisited_offset = 1;
+
+	// walk through the graph using GlobalConnectivity
+	// auto start = std::chrono::high_resolution_clock::now();
 	while (node_num_visited<num_nodes){
 		// find connected nodes that have not been visited yet
 		std::vector<size_t> nns;
-		for (const auto & n : GlobalConnectivity[curr_node])
+		for (const auto &n : GlobalConnectivity[curr_node])
 			if (node_notvisited[n])
 				nns.push_back(n);
 
@@ -91,11 +105,10 @@ auto find_node_order(const std::vector<std::set<size_t>> &GlobalConnectivity, co
 		size_t next_node;
 		if (nns.size()>0){
 			double min_dst = 1.e15;
-			for (size_t i=0; i<nns.size(); i++){
-				size_t candidate = nns[i];
+			for (const auto &candidate : nns){
 				double dst = 0;
 				for (auto &coo : coos)
-					dst += (coo[curr_node]-coo[candidate]) * (coo[curr_node]-coo[candidate]);
+					dst += std::pow(coo[curr_node]-coo[candidate],2);
 				if (dst<min_dst){
 					min_dst   = dst;
 					next_node = candidate;
@@ -103,7 +116,8 @@ auto find_node_order(const std::vector<std::set<size_t>> &GlobalConnectivity, co
 			}
 		}else{
 			// find first not visited node
-			next_node = std::find(node_notvisited.begin(), node_notvisited.end(), true) - node_notvisited.begin();
+			next_node = std::find(node_notvisited.begin()+notvisited_offset, node_notvisited.end(), true) - node_notvisited.begin();
+			notvisited_offset = next_node;
 		}
 		node_notvisited[next_node]   = false;
 		node_order[node_num_visited] = next_node;
@@ -111,8 +125,13 @@ auto find_node_order(const std::vector<std::set<size_t>> &GlobalConnectivity, co
 		curr_node = next_node;
 		node_num_visited++;
 
-		// if(node_num_visited%1000==0)
-		// 	std::cout << node_num_visited << " " << num_nodes << " " << curr_node << std::endl;
+		// auto end = std::chrono::high_resolution_clock::now();
+		// auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+		// if(node_num_visited%1000==0){
+		// 	start = std::chrono::high_resolution_clock::now();
+
+		// 	std::cout << node_num_visited << " " << num_nodes << " " << curr_node << " " << (double)duration.count() / 1e6 << " " << (float)(node_num_visited)/num_nodes << std::endl;
+		// }
 	}
 
 	return node_order;
@@ -234,7 +253,7 @@ int main(int argc, char *argv[])
 		int block_id = 0;
 		for (auto &block : blocks){
 			auto start = std::chrono::high_resolution_clock::now();
-			std::cout << "step = " << step << ", blockID = " << block.BlockID << " out of " << nblocks << std::endl;
+			if (verbose) std::cout << "step = " << step << ", blockID = " << block.BlockID << " out of " << nblocks << std::endl;
 
 			// allocate memory for reading variables
 			std::vector<int64_t> ElementConnectivity;
@@ -276,6 +295,7 @@ int main(int argc, char *argv[])
 			// 	std::cout << node_order[i] << " ";
 			// std::cout << std::endl;
 
+			// reordering map: original index -> ordered index
 			std::vector<size_t> reorder_map(node_order.size());
 			for (size_t i=0; i<reorder_map.size(); i++)
 				reorder_map[node_order[i]] = i;
@@ -313,7 +333,7 @@ int main(int argc, char *argv[])
 
 			total_time += (double)duration.count() / 1e6;
 
-			std::cout << "\ttime = " << (double)duration.count() / 1e6 << " sec" << std::endl;
+			if (verbose) std::cout << "\ttime = " << (double)duration.count() / 1e6 << " sec" << std::endl;
 
 			///////////////////////////////////////////////////////////////
 			// print original and reordered variables
@@ -359,7 +379,7 @@ int main(int argc, char *argv[])
 		bpWriter.EndStep();	// end logical step
 	}
 
-	std::cout << "Total time = " << std::setprecision(3) << total_time << std::endl;
+	if (verbose) std::cout << "Total time = " << std::setprecision(3) << total_time << std::endl;
 
 	bpReader.Close();	// close engine
 	bpWriter.Close();	// close engine

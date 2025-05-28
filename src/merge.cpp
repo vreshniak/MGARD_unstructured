@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
 	}
 	std::string config_file_name = argv[1];
 	std::string input_file_name  = argv[2];
-	std::string merged_file_name = argv[3];
+	std::string output_file_name = argv[3];
 
 	std::ifstream f(config_file_name);
 	json config = json::parse(f);
@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
 	reader_io.SetEngine("BPFile");
 	writer_io.SetEngine("BPFile");
 	adios2::Engine bpReader = reader_io.Open(input_file_name,  adios2::Mode::Read);
-	adios2::Engine bpWriter = writer_io.Open(merged_file_name, adios2::Mode::Write);
+	adios2::Engine bpWriter = writer_io.Open(output_file_name, adios2::Mode::Write);
 
 
 	///////////////////////////////////////////////////////////////////////////

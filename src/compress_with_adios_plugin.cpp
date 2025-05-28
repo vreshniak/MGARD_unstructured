@@ -1,3 +1,13 @@
+/*
+ * compress_adios_with_plugin.cpp :
+ *
+ *  Created on: October 2, 2024
+ *      Author: Viktor Reshniak
+ *
+ *	Reorder serialized DOFs
+ */
+
+
 #include <cmath>
 #include <cstddef>
 
@@ -19,6 +29,10 @@ using BYTE = unsigned char;
 
 
 #define DTYPE double
+
+
+bool verbose = true;
+
 
 
 int main(int argc, char *argv[])
@@ -43,22 +57,32 @@ int main(int argc, char *argv[])
 	///////////////////////////////////////////////////////////////////////////
 	// config
 
-	// read config file
+	// read input
 	if (argc<4){
-		std::cerr << "Usage: compress_adios_plugin config.json orig.bp compressed.bp, compress_adios_plugin got " << argc-1 << " parameters" << std::endl;
+		std::cerr << "Usage: compress_adios_with_plugin config.json orig.bp compressed.bp, `compress_adios_with_plugin` got " << argc-1 << " parameters" << std::endl;
 		return -1;
 	}
 	std::string config_file_name = argv[1];
 	std::string input_file_name  = argv[2];
 	std::string output_file_name = argv[3];
 
+	// read config file
 	std::ifstream f(config_file_name);
 	json config = json::parse(f);
-
 
 	// variable names
 	std::vector<std::string> var_names = config["var_names"];
 
+	// compression params
+	const DTYPE s = config["s"];
+	const DTYPE rel_tol = config["rel_tol"];
+
+	// ADIOS compression
+	// adios2::Operator op = adios.DefineOperator("mgardplus", "mgardplus");
+
+
+	///////////////////////////////////////////////////////////////////////////
+	// ADIOS readers/writers
 
 	// setup ADIOS readers/writers
 #if ADIOS2_USE_MPI
@@ -75,17 +99,6 @@ int main(int argc, char *argv[])
 
 
 	///////////////////////////////////////////////////////////////////////////
-	// compression config
-
-
-	const DTYPE s = config["s"];
-	const DTYPE rel_tol = config["rel_tol"];
-
-	// ADIOS compression
-	// adios2::Operator op = adios.DefineOperator("mgardplus", "mgardplus");
-
-
-	///////////////////////////////////////////////////////////////////////////
 	// define output ADIOS variables
 
 	std::vector<adios2::Variable<DTYPE>> out_adios_vars(var_names.size());
@@ -94,18 +107,16 @@ int main(int argc, char *argv[])
 	}
 
 	///////////////////////////////////////////////////////////////////////////
-
+	// read - compress - write
 
 	double total_time = 0;
-
 
 	// time stepping
 	while (true){
 
 		adios2::StepStatus read_status = bpReader.BeginStep(adios2::StepMode::Read, -1.0f);
 		size_t step = bpReader.CurrentStep();
-		if (step>config["max_step"] or read_status!=adios2::StepStatus::OK)
-			break;
+		if (read_status!=adios2::StepStatus::OK) break;
 		bpWriter.BeginStep();
 
 
@@ -113,26 +124,20 @@ int main(int argc, char *argv[])
 		// define input ADIOS variables
 
 		std::vector<adios2::Variable<double>> adios_vars(var_names.size());
-		std::vector<double> vars_min(var_names.size());
-		std::vector<double> vars_max(var_names.size());
-		for (int i=0; i<var_names.size(); i++){
+		for (int i=0; i<var_names.size(); i++)
 			adios_vars[i] = reader_io.InquireVariable<double>(var_names[i]);
-			vars_min[i] = adios_vars[i].Min();
-			vars_max[i] = adios_vars[i].Max();
-		}
 
 
 		///////////////////////////////////////////////////////////////////////////
 		// compress variables
 
-
 		// number of blocks/subdomains
-		auto blocks = bpReader.BlocksInfo(adios_vars[0], 0);
+		auto blocks = bpReader.BlocksInfo(adios_vars[0], step); // blocks_info(name, step)
 		size_t nblocks = blocks.size();
-		int block_id = 0;
 		for (auto &block : blocks){
+			int block_id = block.BlockID;
 			auto start = std::chrono::high_resolution_clock::now();
-			std::cout << "step = " << step << ", blockID = " << block.BlockID << "/" << nblocks << std::endl;
+			if (verbose) std::cout << "step = " << step << ", blockID = " << block.BlockID << "/" << nblocks << std::endl;
 
 			// allocate memory for reading variables
 			std::vector<std::vector<double>> vars(var_names.size());
@@ -147,24 +152,25 @@ int main(int argc, char *argv[])
 
 
 			//////////////////////////////////////////////////////////////////////////////////
-			// save compressed variables
+			// compress and save compressed variables
 
 			for (int i=0; i<var_names.size(); i++){
 				// find absolute tolerance
-				DTYPE mag_v = 0;
+				double mag_v = 0;
 				for (size_t k=0; k<vars[i].size(); k++)
-					mag_v += vars[i][k] * vars[i][k] / vars[i].size();
-				DTYPE L2_norm = std::sqrt(mag_v);
-				DTYPE abs_tol = rel_tol * L2_norm;
+					mag_v += std::pow(vars[i][k],2) / vars[i].size();
+				double L2_norm = std::sqrt(mag_v); // discrete L2 norm
+				double abs_tol = rel_tol * L2_norm;
 
 				adios2::Params params;
 				params["PluginName"] = "serialize_operator";
 				params["PluginLibrary"] = "CompressMGARDSerializeOperator";
-				params["meshfile"] = "/lustre/orion/cfd164/proj-shared/reshniakv/order.bp"; //argv[2];
-				params["blockid"] = std::to_string(block_id);
+				params["meshfile"] = config["meshfile"];
+				params["node_order"] = config["node_order"];
+				params["blockid"] = std::to_string(block.BlockID);
 				params["accuracy"] = std::to_string(abs_tol);
+				params["mode"] = "ABS";
 				out_adios_vars[i].AddOperation("plugin", params);
-				// // out_adios_vars[i].AddOperation(op, {{"accuracy", std::to_string(abs_tol)}, {"mode", "ABS"}});
 
 				out_adios_vars[i].SetSelection(adios2::Box<adios2::Dims>({}, {vars[i].size()}));
 				bpWriter.Put<DTYPE>(out_adios_vars[i], vars[i].data(), adios2::Mode::Sync);
@@ -176,25 +182,25 @@ int main(int argc, char *argv[])
 
 			///////////////////////////////////////////////////////////////
 
-			// auto end = std::chrono::high_resolution_clock::now();
-			// auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-			// total_time += (double)duration.count() / 1e6;
-
-			// std::cout << std::setprecision(3) << ", time = " << (double)duration.count() / 1e6 << " sec" << std::endl;
+			auto end = std::chrono::high_resolution_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+			total_time += (double)duration.count() / 1e6;
+			if (verbose) std::cout << "\ttime = " << (double)duration.count() / 1e6 << " sec" << std::endl;
 
 
 			///////////////////////////////////////////////////////////////
 
-			if (config["max_block_id"]>=0 and block_id++>=config["max_block_id"]) break;
+			if (config["max_block_id"]>=0 and block_id>=config["max_block_id"]) break;
 		}
 
 		bpReader.EndStep();	// end logical step
 		bpWriter.EndStep();	// end logical step
+
+		if (step>=config["max_step"]) break;
 	}
 
 
-	// std::cout << "\nTotal time = " << std::setprecision(3) << total_time << std::endl;
+	if (verbose) std::cout << "\nTotal time = " << std::setprecision(3) << total_time << std::endl;
 
 
 	bpReader.Close();  // close engine

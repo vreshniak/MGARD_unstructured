@@ -49,7 +49,7 @@ set(SRC_ADD_REORDER_FILES
 	src/add_ordering.cpp
 )
 set(SRC_MAKE_REORDER_FILES
-	src/make_ordering.cpp
+	src/make_meshfile_with_ordering.cpp
 )
 set(SRC_COMPRESS_MGARD_FILES
 	src/compress_mgard.cpp
@@ -61,7 +61,13 @@ set(SRC_COMPRESS_ADIOS_FILES
 	src/compress_adios.cpp
 )
 set(SRC_COMPRESS_ADIOS_PLUGIN_FILES
-	src/compress_adios_with_plugin.cpp
+	src/compress_with_adios_plugin.cpp
+)
+set(SRC_DECOMPRESS_ADIOS_PLUGIN_FILES
+	src/decompress_with_adios_plugin.cpp
+)
+set(SRC_EVALUATE_ERROR_FILES
+	src/evaluate_compression_error.cpp
 )
 set(SRC_COMPRESS_ZFP_FILES
 	src/compress_zfp.cpp
@@ -90,9 +96,9 @@ add_executable(add_ordering ${SRC_ADD_REORDER_FILES})
 target_include_directories(add_ordering PRIVATE include)
 target_link_libraries(add_ordering PRIVATE adios2::cxx11_mpi MPI::MPI_CXX)
 
-add_executable(make_ordering ${SRC_MAKE_REORDER_FILES})
-target_include_directories(make_ordering PRIVATE include)
-target_link_libraries(make_ordering PRIVATE adios2::cxx11_mpi MPI::MPI_CXX)
+add_executable(make_meshfile_with_ordering ${SRC_MAKE_REORDER_FILES})
+target_include_directories(make_meshfile_with_ordering PRIVATE include)
+target_link_libraries(make_meshfile_with_ordering PRIVATE adios2::cxx11_mpi MPI::MPI_CXX)
 
 add_executable(compress_mgard ${SRC_COMPRESS_MGARD_FILES})
 target_include_directories(compress_mgard PRIVATE include)
@@ -106,9 +112,17 @@ add_executable(compress_adios ${SRC_COMPRESS_ADIOS_FILES})
 target_include_directories(compress_adios PRIVATE include)
 target_link_libraries(compress_adios PRIVATE adios2::cxx11_mpi mgard::mgard MPI::MPI_CXX)
 
-add_executable(compress_adios_plugin ${SRC_COMPRESS_ADIOS_PLUGIN_FILES})
-target_include_directories(compress_adios_plugin PRIVATE include)
-target_link_libraries(compress_adios_plugin PRIVATE adios2::cxx11_mpi mgard::mgard MPI::MPI_CXX)
+add_executable(compress_with_adios_plugin ${SRC_COMPRESS_ADIOS_PLUGIN_FILES})
+target_include_directories(compress_with_adios_plugin PRIVATE include)
+target_link_libraries(compress_with_adios_plugin PRIVATE adios2::cxx11_mpi mgard::mgard MPI::MPI_CXX)
+
+add_executable(decompress_with_adios_plugin ${SRC_DECOMPRESS_ADIOS_PLUGIN_FILES})
+target_include_directories(decompress_with_adios_plugin PRIVATE include)
+target_link_libraries(decompress_with_adios_plugin PRIVATE adios2::cxx11_mpi mgard::mgard MPI::MPI_CXX)
+
+add_executable(evaluate_compression_error ${SRC_EVALUATE_ERROR_FILES})
+target_include_directories(evaluate_compression_error PRIVATE include)
+target_link_libraries(evaluate_compression_error PRIVATE adios2::cxx11_mpi mgard::mgard MPI::MPI_CXX)
 
 add_executable(compress_zfp ${SRC_COMPRESS_ZFP_FILES})
 target_include_directories(compress_zfp PRIVATE include)

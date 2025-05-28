@@ -1,4 +1,6 @@
 {
+  "meshfile": "/lustre/orion/cfd164/proj-shared/reshniakv/sol_4199000_mesh_with_ordering.bp",
+  "node_order": "/hpMusic_base/hpMusic_Zone/node_order",
   "connectivity": "/hpMusic_base/hpMusic_Zone/Elem/ElementConnectivity",
   "coo_names": [
     "/hpMusic_base/hpMusic_Zone/GridCoordinates/CoordinateX",
@@ -6,19 +8,21 @@
     "/hpMusic_base/hpMusic_Zone/GridCoordinates/CoordinateZ"
   ],
   "var_names": [
-    "/hpMusic_base/hpMusic_Zone/FlowSolution/P_aver",
-    "/hpMusic_base/hpMusic_Zone/FlowSolution/Rho_aver",
-    "/hpMusic_base/hpMusic_Zone/FlowSolution/U_aver",
-    "/hpMusic_base/hpMusic_Zone/FlowSolution/V_aver",
-    "/hpMusic_base/hpMusic_Zone/FlowSolution/W_aver"
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/Pressure",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/PHI",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/Density",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/CFL",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/VelocityX",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/VelocityY",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/VelocityZ"
   ],
 
   "keep_index_map": false,
 
   "s": 0.0,
-  "rel_tol": 0.0023,
+  "rel_tol": 0.01,
 
-  "max_block_id": 1,
+  "max_block_id": -1,
   "max_step": 0,
   "n_nodes_in_element": 8
 }

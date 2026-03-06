@@ -1,6 +1,7 @@
 # MGARD_unstructured
 
-See deduplication folder
+* deduplication - convert DG data to CG data
+* serialization - compression via serialization of unstructured grids
 
 <!-- ## Build
 ```bash ./build.sh```

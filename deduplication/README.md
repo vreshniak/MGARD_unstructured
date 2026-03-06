@@ -16,3 +16,6 @@ Need to list:
 
 ## Deduplicate DG data to make it continuous
 ```./bin/dedup config.json input.bp output.bp```
+
+### Run with MPI
+```srun -n nnodes ./bin/dedup config.json input.bp output.bp```

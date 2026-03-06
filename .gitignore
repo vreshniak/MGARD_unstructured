@@ -2,7 +2,7 @@ adios-campaign
 json_test/
 bin/
 build/
-output/
+/output/
 to_delete/
 *.txt
 *.png

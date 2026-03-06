@@ -1,0 +1,39 @@
+{
+  "connectivity": "/hpMusic_base/hpMusic_Zone/Elem/ElementConnectivity",
+  "coo_names": [
+    "/hpMusic_base/hpMusic_Zone/GridCoordinates/CoordinateX",
+    "/hpMusic_base/hpMusic_Zone/GridCoordinates/CoordinateY",
+    "/hpMusic_base/hpMusic_Zone/GridCoordinates/CoordinateZ"
+  ],
+  "var_names": [
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/CFL",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/Density",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/PHI",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/Pressure",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/Q_CRITERIA",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/SCHLIEREN",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/VelocityX",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/VelocityY",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/VelocityZ",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/ux",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/uy",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/uz",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/vort_x",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/vort_y",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/vort_z",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/vx",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/vy",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/vz",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/wx",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/wy",
+    "/hpMusic_base/hpMusic_Zone/FlowSolution/wz"
+  ],
+
+  "max_block_id": -1,
+  "max_step": -1,
+  "n_nodes_in_element": 8,
+
+  "convert_to_cgns_standard": true,
+
+  "verbose": true
+}

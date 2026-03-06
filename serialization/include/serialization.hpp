@@ -139,7 +139,7 @@ auto ComputeGlobalConnectivity( const Container ElementConnectivity, size_t num_
 				size_t n2 = ElementConnectivity[k+j];
 				if (n1!=n2){
 					GlobalConnectivity[n1].insert(n2);
-					GlobalConnectivity[n2].insert(n1);
+		// 			GlobalConnectivity[n2].insert(n1);
 				}
 			}
 		}

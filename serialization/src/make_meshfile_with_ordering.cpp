@@ -1,5 +1,5 @@
 /*
- * make_ordering.cpp :
+ * make_meshfile_with_ordering.cpp :
  *
  *  Created on: October 2, 2024
  *      Author: Viktor Reshniak
@@ -251,10 +251,12 @@ int main(int argc, char *argv[])
 
 			size_t num_nodes = coos[0].size();
 
+			std::cout << ElementConnectivity.size() << " " << num_nodes << std::endl;
+
 			// compute connectivity of the node graph
 			auto GlobalConnectivity = ComputeGlobalConnectivity(ElementConnectivity, num_nodes, config["n_nodes_in_element"]);
 
-			auto node_order = find_node_order(GlobalConnectivity, coos);
+			// auto node_order = find_node_order(GlobalConnectivity, coos);
 
 			// node_order  = [4, 3, 0, 2, 1]
 			// reorder_map = [2, 4, 3, 1, 0], i.e.,
@@ -275,27 +277,27 @@ int main(int argc, char *argv[])
 			// save ordering
 
 			// connectivity
-			out_adios_connectivity.SetSelection(adios2::Box<adios2::Dims>({}, {ElementConnectivity.size()}));
-			bpWriter.Put<int64_t>(out_adios_connectivity, ElementConnectivity.data(), adios2::Mode::Sync);
+			// out_adios_connectivity.SetSelection(adios2::Box<adios2::Dims>({}, {ElementConnectivity.size()}));
+			// bpWriter.Put<int64_t>(out_adios_connectivity, ElementConnectivity.data(), adios2::Mode::Sync);
 
-			// coordinates
-			for (int i=0; i<coo_names.size(); i++){
-				out_adios_coos[i].SetSelection(adios2::Box<adios2::Dims>({}, {coos[i].size()}));
-				bpWriter.Put<double>(out_adios_coos[i], coos[i].data(), adios2::Mode::Sync);
-			}
+			// // coordinates
+			// for (int i=0; i<coo_names.size(); i++){
+			// 	out_adios_coos[i].SetSelection(adios2::Box<adios2::Dims>({}, {coos[i].size()}));
+			// 	bpWriter.Put<double>(out_adios_coos[i], coos[i].data(), adios2::Mode::Sync);
+			// }
 
-			// node ordering
-			out_adios_order.SetSelection(adios2::Box<adios2::Dims>({}, {node_order.size()}));
-			bpWriter.Put<int64_t>(out_adios_order, node_order.data(), adios2::Mode::Sync);
+			// // node ordering
+			// out_adios_order.SetSelection(adios2::Box<adios2::Dims>({}, {node_order.size()}));
+			// bpWriter.Put<int64_t>(out_adios_order, node_order.data(), adios2::Mode::Sync);
 
 
-			bpWriter.PerformPuts();
+			// bpWriter.PerformPuts();
 			///////////////////////////////////////////////////////////////
 
-			auto end = std::chrono::high_resolution_clock::now();
-			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-			total_time += (double)duration.count() / 1e6;
-			if (verbose) std::cout << "\ttime = " << (double)duration.count() / 1e6 << " sec" << std::endl;
+			// auto end = std::chrono::high_resolution_clock::now();
+			// auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+			// total_time += (double)duration.count() / 1e6;
+			// if (verbose) std::cout << "\ttime = " << (double)duration.count() / 1e6 << " sec" << std::endl;
 
 
 			///////////////////////////////////////////////////////////////

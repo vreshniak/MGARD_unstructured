@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &nranks);
 #else
-	rank = 0;
+	rank   = 0;
 	nranks = 1;
 #endif
 
@@ -282,12 +282,12 @@ int main(int argc, char *argv[])
 		bpWriter.EndStep();	// end logical step
 	}
 
-	// if (verbose){
-	// 	std::cout << "Total num. orig. nodes = " << total_nodes << std::endl;
-	// 	std::cout << "Total num. uniq. nodes = " << total_unique_nodes << std::endl;
-	// 	std::cout << "Total redundancy = " << (double)total_nodes/(double)total_unique_nodes << std::endl;
-	// 	std::cout << "Total time = " << std::setprecision(3) << total_time << std::endl;
-	// }
+	if (verbose){
+		std::cout << "Total num. orig. nodes = " << total_nodes << std::endl;
+		std::cout << "Total num. uniq. nodes = " << total_unique_nodes << std::endl;
+		std::cout << "Total redundancy = " << (double)total_nodes/(double)total_unique_nodes << std::endl;
+		std::cout << "Total time = " << std::setprecision(3) << total_time << std::endl;
+	}
 
 	bpReader.Close();	// close engine
 	bpWriter.Close();	// close engine

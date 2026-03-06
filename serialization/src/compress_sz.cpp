@@ -10,6 +10,9 @@
 
 #include "mgard/compress.hpp"
 
+#include "zfp.h"
+#include "SZ3/api/sz.hpp"
+
 #include <adios2.h>
 
 #include <nlohmann/json.hpp>
@@ -207,6 +210,8 @@ int main(int argc, char *argv[])
 			bpWriter.Put<DTYPE>(out_adios_coos[i], coos[i].data(), adios2::Mode::Sync);
 		}
 
+		double avg_err = 0;
+
 		for (int i=0; i<var_names.size(); i++){
 			// find absolute tolerance
 			DTYPE mag_v = 0;
@@ -296,21 +301,45 @@ int main(int argc, char *argv[])
 			// return 0;
 
 			// compress variable
-			const mgard::CompressedDataset<1, DTYPE> compressed = mgard::compress(hierarchy, vars[i].data(), s, abs_tol);
+			// const mgard::CompressedDataset<1, DTYPE> compressed = mgard::compress(hierarchy, vars[i].data(), s, abs_tol);
+
+			size_t out_size;
+			// unsigned char *compressed_data = zfp_compress(vars[i].data(), abs_tol, 1, 1, N, &out_size);
+			// double* decompressed_data = zfp_decompress(compressed_data, abs_tol, out_size, 1, 1, N);
+
+            SZ3::Config conf(N);
+            conf.cmprAlgo = SZ3::ALGO_INTERP_LORENZO;
+            conf.errorBoundMode = SZ3::EB_ABS; // refer to def.hpp for all supported error bound mode
+            conf.absErrorBound = abs_tol; // absolute error bound
+            char *compressed_data = SZ_compress(conf, vars[i].data(), out_size);
+            double *decompressed_data = nullptr;
+            SZ_decompress(conf, compressed_data, out_size, decompressed_data);
+
+			mag_v = 0;
+			for (size_t k=0; k<N; k++){
+				// std::cout << decompressed_data[k] << " " << vars[i][k] << "| ";
+				mag_v += (decompressed_data[k]-vars[i][k]) * (decompressed_data[k]-vars[i][k]) / N;
+			}
+			double L2_norm_err = std::sqrt(mag_v);
+
+			// std::cout << "error " << L2_norm_err / (L2_norm+1.e-5) << " " << L2_norm_err << std::endl;
+
 
 			original_size[i]   += static_cast<DTYPE>(N*sizeof(DTYPE));
-			compressed_size[i] += compressed.size();
-			rel_errors[i] += rel_err / ((int)config["max_block_id"]+1); // / nblocks
+			compressed_size[i] += out_size;
+			rel_errors[i] += L2_norm_err / (L2_norm+1.e-5) / ((int)config["max_block_id"]+1); // / nblocks
 
-			out_adios_vars[i].SetSelection(adios2::Box<adios2::Dims>({}, {compressed.size()}));
-			bpWriter.Put<BYTE>(out_adios_vars[i], (BYTE*)compressed.data(), adios2::Mode::Sync);
+			out_adios_vars[i].SetSelection(adios2::Box<adios2::Dims>({}, {out_size}));
+			bpWriter.Put<BYTE>(out_adios_vars[i], (BYTE*)compressed_data, adios2::Mode::Sync);
 
 
 			// const mgard::DecompressedDataset<1, DTYPE> decompressed = mgard::decompress(compressed);
 			// out_adios_vars2[i].SetSelection(adios2::Box<adios2::Dims>({}, {N}));
 			// bpWriter2.Put<DTYPE>(out_adios_vars2[i], (DTYPE*)decompressed.data(), adios2::Mode::Sync);
 
+			avg_err += L2_norm_err / (L2_norm+1.e-5) / vars.size();
 		}
+		std::cout << "\nerror " << avg_err << std::endl;
 		bpWriter.PerformPuts();
 		// bpWriter2.PerformPuts();
 
@@ -332,17 +361,17 @@ int main(int argc, char *argv[])
 
 
 	// print compression ratios
-	// for (int i=0; i<var_names.size(); i++) std::cout << var_names[i]     << " "; std::cout << std::endl;
-	// for (int i=0; i<var_names.size(); i++) std::cout << rel_errors[i]    << " "; std::cout << std::endl;
-	// for (int i=0; i<var_names.size(); i++) std::cout << original_size[i] << " ";
-	// std::cout << std::accumulate(original_size.begin(), original_size.end(), decltype(original_size)::value_type(0));
-	// std::cout << std::endl;
-	// for (int i=0; i<var_names.size(); i++) std::cout << compressed_size[i] << " ";
-	// std::cout << std::accumulate(compressed_size.begin(), compressed_size.end(), decltype(compressed_size)::value_type(0));
-	// std::cout << std::endl;
-	// for (int i=0; i<var_names.size(); i++) std::cout << original_size[i] / compressed_size[i] << " ";
-	// std::cout << std::accumulate(original_size.begin(), original_size.end(), decltype(original_size)::value_type(0)) / std::accumulate(compressed_size.begin(), compressed_size.end(), decltype(compressed_size)::value_type(0)) << " ";
-	// std::cout << std::endl;
+	std::cout << " var_name:  "; for (int i=0; i<var_names.size(); i++) std::cout << var_names[i]     << " "; std::cout << std::endl;
+	std::cout << " rel_error: "; for (int i=0; i<var_names.size(); i++) std::cout << rel_errors[i]    << " "; std::cout << std::endl;
+	std::cout << " orig_size: "; for (int i=0; i<var_names.size(); i++) std::cout << original_size[i] << " ";
+	std::cout << std::accumulate(original_size.begin(), original_size.end(), decltype(original_size)::value_type(0));
+	std::cout << std::endl;
+	std::cout << " comp_size: "; for (int i=0; i<var_names.size(); i++) std::cout << compressed_size[i] << " ";
+	std::cout << std::accumulate(compressed_size.begin(), compressed_size.end(), decltype(compressed_size)::value_type(0));
+	std::cout << std::endl;
+	std::cout << " CR:        "; for (int i=0; i<var_names.size(); i++) std::cout << original_size[i] / compressed_size[i] << " ";
+	std::cout << std::accumulate(original_size.begin(), original_size.end(), decltype(original_size)::value_type(0)) / std::accumulate(compressed_size.begin(), compressed_size.end(), decltype(compressed_size)::value_type(0)) << " ";
+	std::cout << std::endl;
 
 
 	// bpReader.EndStep(); // end logical step
@@ -355,10 +384,10 @@ int main(int argc, char *argv[])
 	}
 
 
-	// std::cout << "\nTotal CR = " << std::setprecision(3)
-	// 		<< std::accumulate(original_size.begin(), original_size.end(), decltype(original_size)::value_type(0)) / std::accumulate(compressed_size.begin(), compressed_size.end(), decltype(compressed_size)::value_type(0))
-	// 		<< std::endl;
-	std::cout << "\nTotal time = " << std::setprecision(3) << total_time << std::endl;
+	std::cout << "\nTotal CR = " << std::setprecision(3)
+			<< std::accumulate(original_size.begin(), original_size.end(), decltype(original_size)::value_type(0)) / std::accumulate(compressed_size.begin(), compressed_size.end(), decltype(compressed_size)::value_type(0))
+			<< std::endl;
+	std::cout << "Total time = " << std::setprecision(3) << total_time << std::endl;
 
 
 	bpReader.Close();  // close engine

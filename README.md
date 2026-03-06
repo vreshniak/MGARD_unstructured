@@ -1,6 +1,8 @@
 # MGARD_unstructured
 
-## Build
+See deduplication folder
+
+<!-- ## Build
 ```bash ./build.sh```
 
 ## Config file
@@ -43,4 +45,4 @@ Need to list:
 
 ```./decompress_with_adios_plugin config.json compressed.bp decompressed.bp```
 
-```./evaluate_compression_error config.json merged.bp decompressed.bp```
+```./evaluate_compression_error config.json merged.bp decompressed.bp``` -->
